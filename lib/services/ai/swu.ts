@@ -23,15 +23,17 @@ interface SwuChatResponse {
 
 function getSwuConfig() {
   return {
-    apiKey: process.env.SWU_API_KEY,
-    userId: process.env.SWU_USER_ID,
-    model: process.env.SWU_MODEL || DEFAULT_MODEL
+    apiKey: (process.env.SWU_API_KEY || process.env.NEXT_PUBLIC_SWU_API_KEY || "").trim(),
+    userId: (process.env.SWU_USER_ID || process.env.NEXT_PUBLIC_SWU_USER_ID || "").trim(),
+    model: (process.env.SWU_MODEL || process.env.NEXT_PUBLIC_SWU_MODEL || DEFAULT_MODEL).trim()
   };
 }
 
 export function isSwuConfigured(apiKey?: string, userId?: string) {
   const config = getSwuConfig();
-  return Boolean((apiKey || config.apiKey) && (userId || config.userId));
+  const effectiveKey = apiKey?.trim() || config.apiKey;
+  const effectiveId = userId?.trim() || config.userId;
+  return Boolean(effectiveKey && effectiveId);
 }
 
 function extractText(payload: SwuChatResponse) {

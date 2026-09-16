@@ -18,12 +18,18 @@ export function SwuSettings() {
   // Load from localStorage on mount
   useEffect(() => {
     if (typeof window !== "undefined") {
-      const savedKey = localStorage.getItem("swu-api-key") || "";
-      const savedId = localStorage.getItem("swu-user-id") || "";
-      let savedModel = localStorage.getItem("swu-model") || "openai/gpt-5.6-luna";
+      const savedKey = localStorage.getItem("swu-api-key") || process.env.NEXT_PUBLIC_SWU_API_KEY || "";
+      const savedId = localStorage.getItem("swu-user-id") || process.env.NEXT_PUBLIC_SWU_USER_ID || "";
+      let savedModel = localStorage.getItem("swu-model") || process.env.NEXT_PUBLIC_SWU_MODEL || "openai/gpt-5.6-luna";
       if (savedModel === "google/gemini-2.5-flash") {
         savedModel = "openai/gpt-5.6-luna";
         localStorage.setItem("swu-model", "openai/gpt-5.6-luna");
+      }
+      if (!localStorage.getItem("swu-api-key") && savedKey) {
+        localStorage.setItem("swu-api-key", savedKey);
+      }
+      if (!localStorage.getItem("swu-user-id") && savedId) {
+        localStorage.setItem("swu-user-id", savedId);
       }
       setApiKey(savedKey);
       setUserId(savedId);

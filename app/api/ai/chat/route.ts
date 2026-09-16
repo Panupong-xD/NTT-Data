@@ -21,7 +21,7 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         configured: false,
-        error: "ยังไม่ได้ตั้งค่า SWU_API_KEY และ SWU_USER_ID ในหน้าตั้งค่าโปรไฟล์ หรือใน .env.local"
+        error: "ยังไม่ได้ตั้งค่า SWU_API_KEY หรือ NEXT_PUBLIC_SWU_API_KEY และ SWU_USER_ID หรือ NEXT_PUBLIC_SWU_USER_ID ในหน้าตั้งค่า หรือใน Environment Variables ของ Vercel"
       },
       { status: 503 }
     );
