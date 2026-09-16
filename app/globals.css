@@ -1,0 +1,71 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 204 100% 98%;
+  --foreground: 211 44% 16%;
+  --card: 0 0% 100%;
+  --card-foreground: 211 44% 16%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 211 44% 16%;
+  --primary: 202 88% 47%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 184 55% 92%;
+  --secondary-foreground: 199 82% 22%;
+  --muted: 204 52% 94%;
+  --muted-foreground: 207 20% 43%;
+  --accent: 151 57% 92%;
+  --accent-foreground: 160 50% 22%;
+  --destructive: 4 82% 58%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 204 34% 88%;
+  --input: 204 34% 88%;
+  --ring: 202 88% 47%;
+  --radius: 1rem;
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top left, rgba(186, 230, 253, 0.55), transparent 34rem),
+    linear-gradient(180deg, #f7fcff 0%, #eef8ff 44%, #f8fbfd 100%);
+  color: hsl(var(--foreground));
+  font-feature-settings: "liga" 1, "kern" 1;
+  letter-spacing: 0;
+  font-family: "Noto Sans Thai", "Sukhumvit Set", "Leelawadee UI", Arial, sans-serif;
+}
+
+button,
+a,
+input,
+select,
+textarea {
+  touch-action: manipulation;
+}
+
+.safe-bottom {
+  padding-bottom: max(1rem, env(safe-area-inset-bottom));
+}
+
+.thin-scrollbar {
+  scrollbar-width: thin;
+}
+
+.thin-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.thin-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(14, 116, 144, 0.25);
+  border-radius: 999px;
+}
