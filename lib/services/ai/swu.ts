@@ -1,7 +1,7 @@
 import { gotScraping } from "got-scraping";
 
 const SWU_BASE_URL = "https://swuai.swu.ac.th";
-const DEFAULT_MODEL = "google/gemini-2.5-flash";
+const DEFAULT_MODEL = "openai/gpt-5.6-luna";
 
 interface SwuChatResponse {
   choices?: Array<{

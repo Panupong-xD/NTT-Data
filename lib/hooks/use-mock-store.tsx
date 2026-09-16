@@ -26,6 +26,7 @@ export function MockStoreProvider({ children }: { children: React.ReactNode }) {
         setDbState((current) => (typeof updater === "function" ? updater(current) : updater));
       },
       resetDb: () => {
+        localStorage.removeItem("wellync-mock-db");
         localStorage.removeItem("true-innovation-mock-db");
         setDbState(loadMockStore());
       }

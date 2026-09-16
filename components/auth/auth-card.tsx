@@ -24,7 +24,7 @@ export function AuthCard({
           </div>
           <div>
             <p className="text-xs font-semibold text-sky-600">Wellync</p>
-            <h1 className="text-xl font-bold text-slate-950">True Health Connect</h1>
+            <h1 className="text-xl font-bold text-slate-950">NTT DATA Health Connect</h1>
           </div>
         </div>
         <Card>

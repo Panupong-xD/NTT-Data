@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { CheckCircle2, HeartPulse, Pill, Send, Droplets, Scale, Activity, Info, Target, Check, X, Calendar, Dumbbell, Utensils, ShieldCheck } from "lucide-react";
+import { CheckCircle2, HeartPulse, Pill, Send, Droplets, Scale, Activity, Info, Target, Check, X, Calendar, Dumbbell, Utensils, ShieldCheck, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -47,13 +47,16 @@ export default function CaregiverHomePage() {
     tasks: []
   };
   const warning = db.earlyWarnings.find((item) => item.patientId === patient.id) || {
+    id: `ew-${patient.id}`,
     patientId: patient.id,
-    level: "normal" as const,
+    level: "green" as const,
     score: 0,
+    contributors: [],
     reason: "กำลังวิเคราะห์ข้อมูลประวัติสุขภาพเริ่มต้น",
     patientRecommendation: "กรุณารอสักครู่ขณะเชื่อมโยงแผนการดูแลของท่าน",
     doctorRecommendation: "ไม่มีข้อควรระวังเร่งด่วนในขณะนี้",
     suggestedAction: "เฝ้าระวังต่อเนื่อง",
+    createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   };
   const pending = records.filter((item) => item.confirmationStatus === "pending").slice(-3);

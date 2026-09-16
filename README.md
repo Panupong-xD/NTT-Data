@@ -16,7 +16,7 @@ A high-fidelity responsive web prototype designed for collaborative chronic dise
   - Data Ownership and Consent Flow (PDPA Aligned)
   - AI-Powered Health Tools
   - Caregiver Strain Monitoring (MCSI)
-  - HL7 FHIR and True IDC Architecture Simulation
+  - HL7 FHIR and NTT DATA Cloud Architecture Simulation
 - Tech Stack
 - Project Directory Structure
 - Getting Started
@@ -97,7 +97,7 @@ In strict compliance with Personal Data Protection principles:
 
 ### AI-Powered Health Tools
 
-The platform integrates with large language models through the SWU AI Gateway (supporting Google Gemini 2.5 Flash and related models), with a built-in fallback simulation layer:
+The platform integrates with large language models through the SWU AI Gateway (supporting openai/gpt-5.6-luna and related models), with a built-in fallback simulation layer:
 
 - Vision OCR for medical device screens.
 - Food nutrient and suitability analysis.
@@ -108,11 +108,11 @@ The platform integrates with large language models through the SWU AI Gateway (s
 
 Implements the Modified Caregiver Strain Index (MCSI) to evaluate physical, psychological, and social burdens experienced by caregivers, providing targeted emotional and operational support.
 
-### HL7 FHIR and True IDC Architecture Simulation
+### HL7 FHIR and NTT DATA Cloud Architecture Simulation
 
 Simulates an enterprise healthcare cloud architecture:
 
-- Cloud Storage: Structured mock database representing centralized True IDC secure cloud storage.
+- Cloud Storage: Structured mock database representing centralized NTT DATA secure cloud storage.
 - Standard Data Structures: Data schemas model FHIR resources including Patient, Observation, Condition, MedicationStatement, CarePlan, and Consent.
 
 ---
@@ -175,7 +175,7 @@ Simulates an enterprise healthcare cloud architecture:
 1. Clone the repository:
    ```bash
    git clone <repository-url>
-   cd true-innovation-mock
+   cd wellync
    ```
 
 2. Install project dependencies:
@@ -196,7 +196,7 @@ Configure `.env.local` with your SWU AI credentials (optional for local mock mod
 ```env
 NEXT_PUBLIC_SWU_API_KEY=your_swu_api_key_here
 NEXT_PUBLIC_SWU_USER_ID=your_swu_user_id_here
-NEXT_PUBLIC_SWU_MODEL=google/gemini-2.5-flash
+NEXT_PUBLIC_SWU_MODEL=openai/gpt-5.6-luna
 ```
 
 Note: SWU AI credentials can also be configured directly in the application UI under the Profile or Doctor Settings pages without editing the `.env.local` file.

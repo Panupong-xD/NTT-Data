@@ -12,18 +12,18 @@ export async function askAI(content: string, files?: Array<{ type: string; name:
   }
 
   // Handle multimodal model fallback for vision tasks (e.g. food/device scanning)
-  let targetModel = model || "google/gemini-2.5-flash";
+  let targetModel = model || "openai/gpt-5.6-luna";
   if (files && files.length > 0) {
     const mLower = targetModel.toLowerCase();
     const isVisionSupported = 
+      mLower.includes("gpt") ||
+      mLower.includes("luna") ||
+      mLower.includes("openai") ||
       mLower.includes("gemini") || 
-      mLower.includes("gpt-4") || 
-      mLower.includes("claude-3-5") || 
-      mLower.includes("claude-3-opus") || 
-      mLower.includes("claude-3-sonnet");
+      mLower.includes("claude");
       
     if (!isVisionSupported) {
-      targetModel = "google/gemini-2.5-flash";
+      targetModel = "openai/gpt-5.6-luna";
     }
   }
 

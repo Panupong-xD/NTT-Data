@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Activity, CalendarClock, Droplets, HeartPulse, Pill, Scale, ShieldCheck, Info, Target, Check, CircleSlash, RotateCcw, CalendarCheck, CheckCircle2, AlertCircle, Dumbbell, Utensils } from "lucide-react";
+import { Activity, CalendarClock, Droplets, HeartPulse, Pill, Scale, ShieldCheck, Info, Target, Check, CircleSlash, RotateCcw, CalendarCheck, CheckCircle2, AlertCircle, Dumbbell, Utensils, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -46,13 +46,16 @@ export default function PatientHomePage() {
     tasks: []
   };
   const warning = db.earlyWarnings.find((item) => item.patientId === patient.id) || {
+    id: `ew-${patient.id}`,
     patientId: patient.id,
-    level: "normal" as const,
+    level: "green" as const,
     score: 0,
+    contributors: [],
     reason: "กำลังวิเคราะห์ข้อมูลประวัติสุขภาพเริ่มต้น",
     patientRecommendation: "กรุณารอสักครู่ขณะเชื่อมโยงแผนการดูแลของท่าน",
     doctorRecommendation: "ไม่มีข้อควรระวังเร่งด่วนในขณะนี้",
     suggestedAction: "เฝ้าระวังต่อเนื่อง",
+    createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   };
   const notification = db.notifications.find((item) => item.userRole === "patient" && item.type !== "hospital");
@@ -138,6 +141,7 @@ export default function PatientHomePage() {
     bmiVal >= 23 || bmiVal < 18.5 ? "yellow" : "green";
 
   const hrRisk: "green" | "yellow" | "orange" | "red" =
+    latest.heartRate > 120 || latest.heartRate < 50 ? "red" :
     latest.heartRate > 100 || latest.heartRate < 60 ? "yellow" : "green";
 
   // Dynamic health score calculation

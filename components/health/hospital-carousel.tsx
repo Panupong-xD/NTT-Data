@@ -49,7 +49,7 @@ export function HospitalCampaignCarousel() {
       el.addEventListener("scroll", handleScroll);
     }
     return () => {
-      if (el) el.removeEventListener("scroll", el.removeEventListener ? handleScroll : () => {});
+      if (el) el.removeEventListener("scroll", handleScroll);
     };
   }, []);
 

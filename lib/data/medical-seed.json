@@ -1,5 +1,5 @@
 {
-  "hospitals": ["โรงพยาบาลนวัตกรรมสุขภาพ", "โรงพยาบาลเมืองอัจฉริยะ", "TRUE IDC Health Cloud"],
+  "hospitals": ["โรงพยาบาลนวัตกรรมสุขภาพ", "โรงพยาบาลเมืองอัจฉริยะ", "NTT DATA Health Cloud"],
   "diagnoses": ["เบาหวานชนิดที่ 2", "ความดันโลหิตสูง", "ไขมันในเลือดสูง", "โรคไตระยะเริ่มต้น"],
   "medications": ["Metformin 500 mg", "Amlodipine 5 mg", "Losartan 50 mg", "Atorvastatin 20 mg"],
   "allergies": ["แพ้เพนิซิลลิน", "แพ้อาหารทะเล", "ไม่มีประวัติแพ้ยา"],

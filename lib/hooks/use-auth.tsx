@@ -148,7 +148,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               id: `plan-${patientId}`,
               patientId: patientId,
               doctorId: "demo-doctor",
-              status: "approved",
+              status: "approved" as const,
               updatedAt: new Date().toISOString(),
               summary: "ควบคุมอาหารเค็มและน้ำตาลอย่างสม่ำเสมอ ออกกำลังกายเบาๆ",
               medication: ["Metformin 500mg (เช้า-เย็น หลังอาหาร)", "Amlodipine 5mg (เช้า หลังอาหาร)"],
@@ -183,9 +183,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               ...somchaiWarning,
               patientId: patientId
             } : {
+              id: `ew-${patientId}`,
               patientId: patientId,
-              level: "normal" as const,
-              message: "สัญญาณชีพอยู่ในเกณฑ์ปกติ",
+              level: "green" as const,
+              score: 0,
+              contributors: [],
+              reason: "สัญญาณชีพอยู่ในเกณฑ์ปกติ",
+              patientRecommendation: "ดูแลสุขภาพต่อเนื่อง",
+              doctorRecommendation: "ไม่มีข้อควรระวังเร่งด่วน",
+              suggestedAction: "เฝ้าระวังต่อเนื่อง",
+              createdAt: new Date().toISOString(),
               updatedAt: new Date().toISOString()
             };
 

@@ -17,10 +17,10 @@ export default function DoctorDashboardPage() {
   return (
     <DoctorShell title="Dashboard">
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard title="Total Patients" value={db.patients.length} icon={Users} tone="blue" />
-        <MetricCard title="High Risk Patients" value={highRisk.length} icon={AlertTriangle} tone="red" />
-        <MetricCard title="Pending Consent" value={pending.length} icon={ClipboardCheck} tone="yellow" />
-        <MetricCard title="Today's Appointments" value={7} icon={CalendarDays} tone="green" />
+        <MetricCard title="Total Patients" value={db.patients.length} icon={Users} />
+        <MetricCard title="High Risk Patients" value={highRisk.length} icon={AlertTriangle} riskLevel="red" />
+        <MetricCard title="Pending Consent" value={pending.length} icon={ClipboardCheck} riskLevel="yellow" />
+        <MetricCard title="Today's Appointments" value={7} icon={CalendarDays} riskLevel="green" />
       </div>
 
       <div className="grid gap-6 xl:grid-cols-2 mt-6">

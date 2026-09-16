@@ -11,8 +11,8 @@ import { getAvailableModels } from "@/lib/services/ai/client";
 export function SwuSettings() {
   const [apiKey, setApiKey] = useState("");
   const [userId, setUserId] = useState("");
-  const [model, setModel] = useState("google/gemini-2.5-flash");
-  const [models, setModels] = useState<string[]>(["google/gemini-2.5-flash"]);
+  const [model, setModel] = useState("openai/gpt-5.6-luna");
+  const [models, setModels] = useState<string[]>(["openai/gpt-5.6-luna"]);
   const [loading, setLoading] = useState(false);
 
   // Load from localStorage on mount
@@ -20,7 +20,11 @@ export function SwuSettings() {
     if (typeof window !== "undefined") {
       const savedKey = localStorage.getItem("swu-api-key") || "";
       const savedId = localStorage.getItem("swu-user-id") || "";
-      const savedModel = localStorage.getItem("swu-model") || "google/gemini-2.5-flash";
+      let savedModel = localStorage.getItem("swu-model") || "openai/gpt-5.6-luna";
+      if (savedModel === "google/gemini-2.5-flash") {
+        savedModel = "openai/gpt-5.6-luna";
+        localStorage.setItem("swu-model", "openai/gpt-5.6-luna");
+      }
       setApiKey(savedKey);
       setUserId(savedId);
       setModel(savedModel);
@@ -39,7 +43,7 @@ export function SwuSettings() {
       const res = await getAvailableModels(keyToUse, idToUse);
       if (res.configured && Array.isArray(res.models)) {
         setModels(res.models);
-        // If current model is not in the list, fallback to first model or gemini-2.5-flash
+        // If current model is not in the list, fallback to first model or openai/gpt-5.6-luna
         if (!res.models.includes(model) && res.models.length > 0) {
           setModel(res.models[0]);
           localStorage.setItem("swu-model", res.models[0]);

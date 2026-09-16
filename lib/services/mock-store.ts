@@ -12,14 +12,22 @@ import {
   ConsentRequest
 } from "@/lib/types";
 
-const STORAGE_KEY = "true-innovation-mock-db";
+const STORAGE_KEY = "wellync-mock-db";
+const LEGACY_STORAGE_KEY = "true-innovation-mock-db";
 
 export function loadMockStore(): MockDatabase {
   if (typeof window === "undefined") return mockDb;
-  const raw = localStorage.getItem(STORAGE_KEY);
+  let raw = localStorage.getItem(STORAGE_KEY);
   if (!raw) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(mockDb));
-    return mockDb;
+    const legacy = localStorage.getItem(LEGACY_STORAGE_KEY);
+    if (legacy) {
+      raw = legacy;
+      localStorage.setItem(STORAGE_KEY, legacy);
+      localStorage.removeItem(LEGACY_STORAGE_KEY);
+    } else {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(mockDb));
+      return mockDb;
+    }
   }
   try {
     const parsed = JSON.parse(raw) as MockDatabase;

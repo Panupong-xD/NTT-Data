@@ -65,7 +65,7 @@ Loading Screen
 Entire application must use Thai.
 Only keep English for unavoidable medical or technical terms such as
 HL7 FHIR
-TRUE IDC
+NTT DATA Cloud
 API
 Dashboard
 AI
@@ -726,7 +726,7 @@ Patient grants platform consent.
 
 Hospital uploads medical records (Mock).
 
-TRUE IDC stores data (Mock).
+NTT DATA Cloud stores data (Mock).
 
 Doctor requests patient records.
 
@@ -766,7 +766,7 @@ Everything should use mock data while keeping workflow realistic.
 
 ---
 
-# TRUE IDC & HL7 FHIR
+# NTT DATA Cloud & HL7 FHIR
 
 Do not implement real HL7 FHIR.
 
@@ -776,7 +776,7 @@ Show concepts such as
 
 Hospital
 
-TRUE IDC
+NTT DATA Cloud
 
 FHIR Resource
 
