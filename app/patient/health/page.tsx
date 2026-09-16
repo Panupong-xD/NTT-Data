@@ -659,16 +659,16 @@ export default function PatientHealthPage() {
             </CardContent>
           </Card>
 
-          <div className="space-y-3">
+          <ul className="space-y-3">
             {records.slice(-7).reverse().map((record) => (
-              <Card key={record.id}>
-                <CardContent className="flex items-center gap-3 p-4">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-sky-50 text-sky-700">
+              <li key={record.id}>
+                <article className="flex items-center gap-3 rounded-2xl border bg-white p-4 shadow-card">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-sky-50 text-sky-700">
                     <HeartPulse className="h-5 w-5" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="font-bold">{record.systolic}/{record.diastolic} · น้ำตาล {record.bloodSugar}</p>
-                    <p className="text-xs text-slate-500">{formatThaiDate(record.date)} · {record.source === "patient" ? "ผู้ป่วยบันทึก" : "อุปกรณ์/ผู้ดูแล"}</p>
+                    <p className="font-bold text-slate-900">{record.systolic}/{record.diastolic} · น้ำตาล {record.bloodSugar}</p>
+                    <p className="text-xs text-slate-500 mt-0.5">{formatThaiDate(record.date)} · {record.source === "patient" ? "ผู้ป่วยบันทึก" : "อุปกรณ์/ผู้ดูแล"}</p>
                   </div>
                   <Badge tone={record.confirmationStatus === "confirmed" ? "green" : record.confirmationStatus === "rejected" ? "red" : "yellow"}>
                     {record.confirmationStatus === "confirmed" ? "ยืนยันแล้ว" : record.confirmationStatus === "rejected" ? "ปฏิเสธ" : "รอยืนยัน"}
@@ -676,10 +676,10 @@ export default function PatientHealthPage() {
                   <Button size="icon" variant="ghost" onClick={() => setDb((current) => deleteHealthRecord(current, record.id))}>
                     <Trash2 className="h-4 w-4" />
                   </Button>
-                </CardContent>
-              </Card>
+                </article>
+              </li>
             ))}
-          </div>
+          </ul>
         </TabsContent>
 
         <TabsContent value="charts" className="space-y-4">

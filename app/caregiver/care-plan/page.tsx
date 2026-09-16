@@ -4,7 +4,6 @@ import { useState } from "react";
 import { Check, CircleSlash, Pill, RotateCcw, Utensils, Dumbbell, CalendarCheck, Calendar, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MobileShell } from "@/components/layouts/mobile-shell";
 import { useMockStore } from "@/lib/hooks/use-mock-store";
 import { confirmTaskStatus } from "@/lib/services/mock-store";
@@ -70,19 +69,17 @@ export default function CaregiverCarePlanPage() {
   return (
     <MobileShell role="caregiver" title="แผนดูแลผู้ป่วย">
       {/* Interactive Calendar Widget */}
-      <Card className="border border-slate-100 shadow-sm rounded-3xl overflow-hidden bg-white">
-        <CardHeader className="pb-3 border-b border-slate-100">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-sm font-bold flex items-center gap-1.5 text-slate-800">
-              <CalendarCheck className="h-4.5 w-4.5 text-sky-600" />
-              ปฏิทินแผนการดูแลและการนัดหมาย
-            </CardTitle>
-            <span className="text-[11px] font-extrabold text-sky-700 bg-sky-50 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
-              กรกฎาคม 2569
-            </span>
-          </div>
-        </CardHeader>
-        <CardContent className="p-4">
+      <section className="border border-slate-100 shadow-sm rounded-3xl overflow-hidden bg-white">
+        <header className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
+          <h3 className="text-sm font-bold flex items-center gap-1.5 text-slate-800">
+            <CalendarCheck className="h-4.5 w-4.5 text-sky-600" />
+            ปฏิทินแผนการดูแลและการนัดหมาย
+          </h3>
+          <span className="text-[11px] font-extrabold text-sky-700 bg-sky-50 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+            กรกฎาคม 2569
+          </span>
+        </header>
+        <div className="p-4">
           {/* Days of the week */}
           <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-extrabold text-slate-400 uppercase mb-2">
             <span>อา.</span>
@@ -168,53 +165,53 @@ export default function CaregiverCarePlanPage() {
               </span>
             )}
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </section>
 
-      <Card>
-        <CardHeader className="flex-row items-start justify-between gap-3">
+      <section className="rounded-3xl border bg-white p-6 shadow-card space-y-3">
+        <header className="flex items-start justify-between gap-3">
           <div>
-            <CardTitle>แผนรักษาของ {patient.name}</CardTitle>
+            <h3 className="text-lg font-bold text-slate-900">แผนรักษาของ {patient.name}</h3>
             <p className="mt-1 text-sm text-slate-500">อัปเดต {formatThaiDate(plan.updatedAt)}</p>
           </div>
           <Badge tone={plan.status === "published" ? "green" : "yellow"}>
             {plan.status === "published" ? "เผยแพร่แล้ว" : "ฉบับร่าง"}
           </Badge>
-        </CardHeader>
-        <CardContent>
-          <div className="rounded-2xl bg-sky-50 p-4 text-sm leading-6 text-slate-700">
-            <MarkdownRenderer content={plan.summary} />
-          </div>
-        </CardContent>
-      </Card>
+        </header>
+        <div className="rounded-2xl bg-sky-50 p-4 text-sm leading-6 text-slate-700">
+          <MarkdownRenderer content={plan.summary} />
+        </div>
+      </section>
 
       <div className="grid gap-4 sm:grid-cols-2">
         {sections.map(([title, items, Icon]) => (
-          <Card key={title}>
-            <CardHeader><CardTitle className="flex items-center gap-2"><Icon className="h-5 w-5 text-sky-600" /> {title}</CardTitle></CardHeader>
-            <CardContent className="space-y-2">
+          <article key={title} className="rounded-3xl border bg-white p-5 shadow-card space-y-3">
+            <header>
+              <h4 className="flex items-center gap-2 font-bold text-slate-900"><Icon className="h-5 w-5 text-sky-600" /> {title}</h4>
+            </header>
+            <ul className="space-y-2">
               {items.map((item) => (
-                <div key={item} className="rounded-2xl bg-sky-50 px-4 py-3 text-sm font-medium text-slate-700">{item}</div>
+                <li key={item} className="rounded-2xl bg-sky-50 px-4 py-3 text-sm font-medium text-slate-700">{item}</li>
               ))}
-            </CardContent>
-          </Card>
+            </ul>
+          </article>
         ))}
       </div>
 
       {/* Daily checklist verification log */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+      <section className="rounded-3xl border bg-white p-6 shadow-card space-y-4">
+        <header>
+          <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
             <Calendar className="h-5 w-5 text-sky-600" />
             ตรวจสอบแผนงานคนไข้{selectedDate === 11 ? "วันนี้" : `วันที่ ${selectedDate} ก.ค.`}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
+          </h3>
+        </header>
+        <ul className="space-y-3">
           {currentTasks.map((task) => (
-            <div key={task.id} className="rounded-2xl border bg-white p-4">
+            <li key={task.id} className="rounded-2xl border bg-white p-4">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="font-bold">{task.title}</p>
+                  <p className="font-bold text-slate-900">{task.title}</p>
                   <p className="mt-1 text-sm text-slate-500">{task.time} · {task.detail}</p>
                 </div>
                 <div>
@@ -229,11 +226,10 @@ export default function CaregiverCarePlanPage() {
                   )}
                 </div>
               </div>
-
-            </div>
+            </li>
           ))}
-        </CardContent>
-      </Card>
+        </ul>
+      </section>
     </MobileShell>
   );
 }

@@ -69,44 +69,42 @@ export function MobileShell({
   return (
     <Protected role={role}>
       <div className="mx-auto min-h-screen w-full max-w-3xl bg-gradient-to-b from-white/80 to-sky-50/80">
-        <header className="sticky top-0 z-30 border-b border-sky-100 bg-white/88 px-5 py-3.5 backdrop-blur-xl">
-          <div className="flex items-center justify-between">
-            <div>
-              {title === "WELLYNC" ? (
-                <h1 className="text-[20px] font-black text-sky-600 tracking-wider uppercase">WELLYNC</h1>
-              ) : (
-                <>
-                  <p className="text-[10px] font-black text-sky-600 uppercase tracking-widest">Wellync</p>
-                  <h1 className="text-[17px] font-extrabold text-slate-950 mt-0.5">{title}</h1>
-                </>
-              )}
-            </div>
-            
-            {/* Top-Right Notification/Alert Button (Bell icon for both Patient and Caregiver) */}
-            {role === "patient" ? (
-              <Link
-                href="/patient/notifications"
-                className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-100 text-sky-700 hover:bg-sky-200 transition-colors relative shrink-0"
-                aria-label="การแจ้งเตือน"
-              >
-                <Bell className="h-4.5 w-4.5" />
-                {hasIndicator && (
-                  <span className="absolute top-[8px] right-[8px] h-[10px] w-[10px] rounded-full bg-red-500" />
-                )}
-              </Link>
+        <header className="sticky top-0 z-30 flex items-center justify-between border-b border-sky-100 bg-white/88 px-5 py-3.5 backdrop-blur-xl">
+          <div>
+            {title === "WELLYNC" ? (
+              <h1 className="text-[20px] font-black text-sky-600 tracking-wider uppercase">WELLYNC</h1>
             ) : (
-              <Link
-                href="/caregiver/alerts"
-                className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-100 text-sky-700 hover:bg-sky-200 transition-colors relative shrink-0"
-                aria-label="การแจ้งเตือนและการดูแลความเสี่ยง"
-              >
-                <Bell className="h-4.5 w-4.5" />
-                {hasIndicator && (
-                  <span className="absolute top-[8px] right-[8px] h-[10px] w-[10px] rounded-full bg-red-500" />
-                )}
-              </Link>
+              <>
+                <p className="text-[10px] font-black text-sky-600 uppercase tracking-widest">Wellync</p>
+                <h1 className="text-[17px] font-extrabold text-slate-950 mt-0.5">{title}</h1>
+              </>
             )}
           </div>
+          
+          {/* Top-Right Notification/Alert Button (Bell icon for both Patient and Caregiver) */}
+          {role === "patient" ? (
+            <Link
+              href="/patient/notifications"
+              className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-sky-700 hover:bg-sky-200 transition-colors"
+              aria-label="การแจ้งเตือน"
+            >
+              <Bell className="h-4.5 w-4.5" />
+              {hasIndicator && (
+                <span className="absolute top-[8px] right-[8px] h-[10px] w-[10px] rounded-full bg-red-500" />
+              )}
+            </Link>
+          ) : (
+            <Link
+              href="/caregiver/alerts"
+              className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-sky-700 hover:bg-sky-200 transition-colors"
+              aria-label="การแจ้งเตือนและการดูแลความเสี่ยง"
+            >
+              <Bell className="h-4.5 w-4.5" />
+              {hasIndicator && (
+                <span className="absolute top-[8px] right-[8px] h-[10px] w-[10px] rounded-full bg-red-500" />
+              )}
+            </Link>
+          )}
         </header>
 
         <motion.main
@@ -118,26 +116,24 @@ export function MobileShell({
           {children}
         </motion.main>
 
-        <nav className="fixed bottom-0 left-1/2 z-40 w-full max-w-3xl -translate-x-1/2 border-t border-sky-100 bg-white/94 px-4 pb-2.5 pt-1.5 backdrop-blur-xl">
-          <div className="grid grid-cols-4 gap-1">
-            {navItems.map((item) => {
-              const active = pathname === item.href;
-              const Icon = item.icon;
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={cn(
-                    "flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-xl text-[10px] font-semibold text-slate-500 transition",
-                    active && "bg-sky-50 text-sky-700"
-                  )}
-                >
-                  <Icon className="h-4.5 w-4.5" />
-                  <span>{item.label}</span>
-                </Link>
-              );
-            })}
-          </div>
+        <nav className="fixed bottom-0 left-1/2 z-40 grid w-full max-w-3xl -translate-x-1/2 grid-cols-4 gap-1 border-t border-sky-100 bg-white/94 px-4 pb-2.5 pt-1.5 backdrop-blur-xl">
+          {navItems.map((item) => {
+            const active = pathname === item.href;
+            const Icon = item.icon;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  "flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-xl text-[10px] font-semibold text-slate-500 transition",
+                  active && "bg-sky-50 text-sky-700"
+                )}
+              >
+                <Icon className="h-4.5 w-4.5" />
+                <span>{item.label}</span>
+              </Link>
+            );
+          })}
         </nav>
       </div>
     </Protected>

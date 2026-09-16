@@ -1,6 +1,5 @@
 import { Info, LucideIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { RiskLevel } from "@/lib/types";
 
@@ -29,32 +28,30 @@ export function MetricCard({
   }[riskLevel || "green"];
 
   return (
-    <Card className="border border-slate-100 shadow-sm rounded-2xl overflow-hidden bg-white transition-all duration-300">
-      <CardContent className="flex items-center gap-2.5 p-3">
-        <div className="flex h-9.5 w-9.5 shrink-0 items-center justify-center rounded-xl bg-sky-50 text-sky-600">
-          <Icon className="h-4.5 w-4.5" />
+    <article className="flex items-center gap-2.5 rounded-2xl border border-slate-100 bg-white p-3 shadow-sm transition-all duration-300">
+      <div className="flex h-9.5 w-9.5 shrink-0 items-center justify-center rounded-xl bg-sky-50 text-sky-600">
+        <Icon className="h-4.5 w-4.5" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <header className="flex items-center justify-between gap-1">
+          <p className="truncate text-[10px] font-bold uppercase tracking-wide text-slate-450">{title}</p>
+          {onInfoClick ? (
+            <button
+              onClick={onInfoClick}
+              className="shrink-0 rounded-full p-0.5 text-slate-400 transition-colors hover:bg-slate-100/50 hover:text-sky-600"
+              aria-label={`ข้อมูลแนะนำสำหรับ ${title}`}
+            >
+              <Info className="h-3 w-3" />
+            </button>
+          ) : null}
+        </header>
+        <div className="mt-0.5 flex items-end gap-0.5">
+          <span className={cn("text-lg font-extrabold leading-none tracking-tight", textValClass)}>{value}</span>
+          {unit ? <span className="pb-0.5 pl-0.5 text-[9px] font-bold uppercase leading-none text-slate-400">{unit}</span> : null}
         </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center justify-between gap-1">
-            <p className="text-[10px] font-bold text-slate-450 uppercase tracking-wide truncate">{title}</p>
-            {onInfoClick ? (
-              <button
-                onClick={onInfoClick}
-                className="p-0.5 text-slate-400 hover:text-sky-600 rounded-full hover:bg-slate-100/50 transition-colors shrink-0"
-                aria-label={`ข้อมูลแนะนำสำหรับ ${title}`}
-              >
-                <Info className="h-3 w-3" />
-              </button>
-            ) : null}
-          </div>
-          <div className="flex items-end gap-0.5 mt-0.5">
-            <span className={cn("text-lg font-extrabold leading-none tracking-tight", textValClass)}>{value}</span>
-            {unit ? <span className="text-[9px] font-bold text-slate-400 uppercase leading-none pb-0.5 pl-0.5">{unit}</span> : null}
-          </div>
-          {note ? <p className="mt-1 text-[9px] text-slate-400">{note}</p> : null}
-        </div>
-      </CardContent>
-    </Card>
+        {note ? <p className="mt-1 text-[9px] text-slate-400">{note}</p> : null}
+      </div>
+    </article>
   );
 }
 

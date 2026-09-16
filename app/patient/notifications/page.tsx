@@ -4,7 +4,6 @@ import { useEffect } from "react";
 import { Bell, Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MobileShell } from "@/components/layouts/mobile-shell";
 import { useMockStore } from "@/lib/hooks/use-mock-store";
 import { updateConsentStatus } from "@/lib/services/mock-store";
@@ -38,9 +37,11 @@ export default function PatientNotificationsPage() {
 
   return (
     <MobileShell role="patient" title="แจ้งเตือน">
-      <Card>
-        <CardHeader><CardTitle>คำขอเข้าถึงจากโรงพยาบาล</CardTitle></CardHeader>
-        <CardContent className="space-y-3">
+      <section className="rounded-3xl border bg-white p-6 shadow-card">
+        <header className="mb-4">
+          <h3 className="text-lg font-bold text-slate-900">คำขอเข้าถึงจากโรงพยาบาล</h3>
+        </header>
+        <div className="space-y-3">
           {consents.map((consent) => (
             <div key={consent.id} className="rounded-2xl bg-sky-50 p-4">
               <div className="flex items-start justify-between gap-3">
@@ -65,30 +66,30 @@ export default function PatientNotificationsPage() {
               ) : null}
             </div>
           ))}
-        </CardContent>
-      </Card>
+        </div>
+      </section>
 
-      <div className="space-y-3">
+      <ul className="space-y-3">
         {notifications.map((item) => (
-          <Card key={item.id}>
-            <CardContent className="flex gap-3 p-4">
+          <li key={item.id}>
+            <article className="flex gap-3 rounded-2xl border bg-white p-4 shadow-card">
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-sky-50 text-sky-700">
                 <Bell className="h-5 w-5" />
               </div>
-              <div>
+              <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   {!item.read && (
                     <span className="h-2 w-2 rounded-full bg-rose-500 shrink-0 animate-pulse" />
                   )}
-                  <p className="font-bold">{item.title}</p>
+                  <p className="font-bold text-slate-900">{item.title}</p>
                 </div>
                 <p className="mt-1 text-sm leading-6 text-slate-500">{item.message}</p>
                 <p className="mt-2 text-xs font-semibold text-sky-700">{formatThaiDate(item.date)}</p>
               </div>
-            </CardContent>
-          </Card>
+            </article>
+          </li>
         ))}
-      </div>
+      </ul>
     </MobileShell>
   );
 }

@@ -2,7 +2,6 @@
 
 import { AlertTriangle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
 import { DoctorShell } from "@/components/layouts/doctor-shell";
 import { EarlyWarningCard } from "@/components/health/early-warning-card";
 import { useMockStore } from "@/lib/hooks/use-mock-store";
@@ -17,22 +16,20 @@ export default function DoctorAlertsPage() {
           {alerts.map((warning) => {
             const patient = db.patients.find((item) => item.id === warning.patientId)!;
             return (
-              <Card key={warning.id}>
-                <CardContent className="flex items-start gap-4 p-5">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-orange-50 text-orange-600">
-                    <AlertTriangle className="h-6 w-6" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <p className="font-bold">{patient.name}</p>
-                        <p className="mt-1 text-sm leading-6 text-slate-500">{warning.reason}</p>
-                      </div>
-                      <Badge tone={warning.level}>{warning.score}</Badge>
+              <article key={warning.id} className="flex items-start gap-4 rounded-3xl border bg-white p-5 shadow-card">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-orange-50 text-orange-600">
+                  <AlertTriangle className="h-6 w-6" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="font-bold">{patient.name}</p>
+                      <p className="mt-1 text-sm leading-6 text-slate-500">{warning.reason}</p>
                     </div>
+                    <Badge tone={warning.level}>{warning.score}</Badge>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </article>
             );
           })}
         </div>

@@ -223,94 +223,92 @@ export default function CaregiverHomePage() {
       </div>
 
       {/* Treatment Target Section (Larger Post-it Carousel) */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between px-1">
-          <h3 className="text-[15px] font-extrabold text-slate-555 uppercase tracking-wider flex items-center gap-1.5">
-            <Target className="h-4 w-4 text-sky-600 animate-pulse" />
-            เป้าหมายการดูแลสุขภาพของคนไข้
-          </h3>
-        </div>
+      <section className="space-y-3">
+        <h3 className="flex items-center gap-1.5 px-1 text-[15px] font-extrabold uppercase tracking-wider text-slate-555">
+          <Target className="h-4 w-4 animate-pulse text-sky-600" />
+          เป้าหมายการดูแลสุขภาพของคนไข้
+        </h3>
 
         <div
-          className="flex overflow-x-auto gap-6 px-2 pb-5 pt-2 scroll-smooth snap-x snap-mandatory scrollbar-none"
+          className="flex gap-6 overflow-x-auto px-2 pb-5 pt-2 scroll-smooth snap-x snap-mandatory scrollbar-none"
           style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
         >
           {/* Post-it 1: Sugar */}
-          <div className="w-[300px] shrink-0 snap-start relative pt-3">
+          <article className="relative w-[300px] shrink-0 snap-start pt-3">
             {/* Masking Tape */}
-            <div className="w-16 h-5 bg-white/40 backdrop-blur-[0.5px] border border-white/20 rotate-[-2deg] absolute top-1 left-1/2 -translate-x-1/2 shadow-[0_1px_2px_rgba(0,0,0,0.05)] z-10" />
+            <div className="absolute left-1/2 top-1 z-10 h-5 w-16 -translate-x-1/2 rotate-[-2deg] border border-white/20 bg-white/40 shadow-[0_1px_2px_rgba(0,0,0,0.05)] backdrop-blur-[0.5px]" />
             
             {/* Paper Note */}
-            <div className="rotate-[-1.5deg] bg-[#e0f2fe] p-5 pb-3.5 shadow-[3px_6px_14px_rgba(0,0,0,0.08)] rounded-[2px] flex flex-col justify-between h-[155px] text-slate-800 border-l-[3.5px] border-sky-300">
+            <div className="flex h-[155px] rotate-[-1.5deg] flex-col justify-between rounded-[2px] border-l-[3.5px] border-sky-300 bg-[#e0f2fe] p-5 pb-3.5 text-slate-800 shadow-[3px_6px_14px_rgba(0,0,0,0.08)]">
               <div>
-                <span className="text-[10px] font-black text-sky-700 bg-sky-200/50 px-2.5 py-0.5 rounded uppercase tracking-wider">เป้าหมายน้ำตาล</span>
-                <p className="text-xs text-slate-700 mt-3 leading-relaxed font-semibold">
-                  ค่าน้ำตาลเจาะจากปลายนิ้วตอนเช้าก่อนทานอาหาร ควรคุมให้อยู่ในช่วง <span className="font-black text-sky-900 text-[13px]">80 ถึง 130 mg/dL</span>
+                <span className="rounded bg-sky-200/50 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-sky-700">เป้าหมายน้ำตาล</span>
+                <p className="mt-3 text-xs font-semibold leading-relaxed text-slate-700">
+                  ค่าน้ำตาลเจาะจากปลายนิ้วตอนเช้าก่อนทานอาหาร ควรคุมให้อยู่ในช่วง <span className="text-[13px] font-black text-sky-900">80 ถึง 130 mg/dL</span>
                 </p>
               </div>
-              <div className="text-[10px] font-bold text-sky-700/80 border-t border-sky-300/30 pt-2 flex justify-between">
+              <footer className="flex justify-between border-t border-sky-300/30 pt-2 text-[10px] font-bold text-sky-700/80">
                 <span>ค่าน้ำตาลสะสมเฉลี่ยในร่างกาย:</span>
                 <span className="font-extrabold text-sky-900">น้อยกว่า 7%</span>
-              </div>
+              </footer>
             </div>
-          </div>
+          </article>
 
           {/* Post-it 2: BP */}
-          <div className="w-[300px] shrink-0 snap-start relative pt-3">
+          <article className="relative w-[300px] shrink-0 snap-start pt-3">
             {/* Masking Tape */}
-            <div className="w-16 h-5 bg-white/40 backdrop-blur-[0.5px] border border-white/20 rotate-[3deg] absolute top-1 left-1/2 -translate-x-1/2 shadow-[0_1px_2px_rgba(0,0,0,0.05)] z-10" />
+            <div className="absolute left-1/2 top-1 z-10 h-5 w-16 -translate-x-1/2 rotate-[3deg] border border-white/20 bg-white/40 shadow-[0_1px_2px_rgba(0,0,0,0.05)] backdrop-blur-[0.5px]" />
             
             {/* Paper Note */}
-            <div className="rotate-[1deg] bg-[#e0f2fe] p-5 pb-3.5 shadow-[3px_6px_14px_rgba(0,0,0,0.08)] rounded-[2px] flex flex-col justify-between h-[155px] text-slate-800 border-l-[3.5px] border-sky-300">
+            <div className="flex h-[155px] rotate-[1deg] flex-col justify-between rounded-[2px] border-l-[3.5px] border-sky-300 bg-[#e0f2fe] p-5 pb-3.5 text-slate-800 shadow-[3px_6px_14px_rgba(0,0,0,0.08)]">
               <div>
-                <span className="text-[10px] font-black text-sky-700 bg-sky-200/50 px-2.5 py-0.5 rounded uppercase tracking-wider">เป้าหมายความดัน</span>
-                <p className="text-xs text-slate-700 mt-3 leading-relaxed font-semibold">
-                  คุมความดันโลหิตให้อยู่ในเกณฑ์ที่ปลอดภัย <span className="font-black text-sky-900 text-[13px]">ต่ำกว่า 130/80 mmHg</span>
+                <span className="rounded bg-sky-200/50 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-sky-700">เป้าหมายความดัน</span>
+                <p className="mt-3 text-xs font-semibold leading-relaxed text-slate-700">
+                  คุมความดันโลหิตให้อยู่ในเกณฑ์ที่ปลอดภัย <span className="text-[13px] font-black text-sky-900">ต่ำกว่า 130/80 mmHg</span>
                 </p>
               </div>
-              <div className="text-[10px] font-bold text-sky-700/80 border-t border-sky-300/30 pt-2 flex justify-between">
+              <footer className="flex justify-between border-t border-sky-300/30 pt-2 text-[10px] font-bold text-sky-700/80">
                 <span>เป้าหมายเพื่อป้องกัน:</span>
                 <span className="font-extrabold text-sky-900">โรคแทรกซ้อนหลอดเลือด</span>
-              </div>
+              </footer>
             </div>
-          </div>
+          </article>
 
           {/* Post-it 3: Exercise */}
-          <div className="w-[300px] shrink-0 snap-start relative pt-3">
+          <article className="relative w-[300px] shrink-0 snap-start pt-3">
             {/* Masking Tape */}
-            <div className="w-16 h-5 bg-white/40 backdrop-blur-[0.5px] border border-white/20 rotate-[-1deg] absolute top-1 left-1/2 -translate-x-1/2 shadow-[0_1px_2px_rgba(0,0,0,0.05)] z-10" />
+            <div className="absolute left-1/2 top-1 z-10 h-5 w-16 -translate-x-1/2 rotate-[-1deg] border border-white/20 bg-white/40 shadow-[0_1px_2px_rgba(0,0,0,0.05)] backdrop-blur-[0.5px]" />
             
             {/* Paper Note */}
-            <div className="rotate-[-1deg] bg-[#e0f2fe] p-5 pb-3.5 shadow-[3px_6px_14px_rgba(0,0,0,0.08)] rounded-[2px] flex flex-col justify-between h-[155px] text-slate-850 border-l-[3.5px] border-sky-300">
+            <div className="flex h-[155px] rotate-[-1deg] flex-col justify-between rounded-[2px] border-l-[3.5px] border-sky-300 bg-[#e0f2fe] p-5 pb-3.5 text-slate-850 shadow-[3px_6px_14px_rgba(0,0,0,0.08)]">
               <div>
-                <span className="text-[10px] font-black text-sky-700 bg-sky-200/50 px-2.5 py-0.5 rounded uppercase tracking-wider">เป้าหมายกิจกรรม</span>
-                <p className="text-xs text-slate-700 mt-3 leading-relaxed font-semibold">
-                  ออกกำลังกายเบาๆ เช่น เดินเร็วสะสมความเหนื่อยให้ได้ <span className="font-black text-sky-900 text-[13px]">150 นาทีต่อสัปดาห์</span>
+                <span className="rounded bg-sky-200/50 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-sky-700">เป้าหมายกิจกรรม</span>
+                <p className="mt-3 text-xs font-semibold leading-relaxed text-slate-700">
+                  ออกกำลังกายเบาๆ เช่น เดินเร็วสะสมความเหนื่อยให้ได้ <span className="text-[13px] font-black text-sky-900">150 นาทีต่อสัปดาห์</span>
                 </p>
               </div>
-              <div className="text-[10px] font-bold text-sky-700/80 border-t border-sky-300/30 pt-2 flex justify-between">
+              <footer className="flex justify-between border-t border-sky-300/30 pt-2 text-[10px] font-bold text-sky-700/80">
                 <span>คำแนะนำแพทย์:</span>
                 <span className="font-extrabold text-sky-900">เฉลี่ยวันละ 30 นาที 5 วัน</span>
-              </div>
+              </footer>
             </div>
-          </div>
+          </article>
         </div>
-      </div>
+      </section>
 
       {/* Minimal & Creative Vertical Timeline Checklist */}
-      <Card className="border border-slate-100 shadow-soft">
-        <CardHeader className="flex-row items-center justify-between pb-3 bg-slate-50/20 border-b border-slate-100/50">
+      <section className="rounded-2xl border border-slate-100 bg-white shadow-soft">
+        <header className="flex flex-row items-center justify-between border-b border-slate-100/50 bg-slate-50/20 p-4 pb-3">
           <div>
-            <CardTitle className="text-[14px] font-bold text-slate-800 uppercase tracking-wide">
+            <h3 className="text-[14px] font-bold uppercase tracking-wide text-slate-800">
               งานดูแลวันนี้ของ {patient.name}
-            </CardTitle>
-            <p className="text-[10px] text-slate-400 font-medium">อนุมัติหรือตรวจสอบบันทึกกิจกรรมของคนไข้ในความดูแล</p>
+            </h3>
+            <p className="text-[10px] font-medium text-slate-400">อนุมัติหรือตรวจสอบบันทึกกิจกรรมของคนไข้ในความดูแล</p>
           </div>
-          <span className="text-[11px] font-bold text-sky-700 bg-sky-50 px-2.5 py-0.5 rounded-full border border-sky-100/70">
+          <span className="rounded-full border border-sky-100/70 bg-sky-50 px-2.5 py-0.5 text-[11px] font-bold text-sky-700">
             สำเร็จ {plan.tasks.filter((t) => t.status === "completed").length}/{plan.tasks.length}
           </span>
-        </CardHeader>
-        <CardContent className="p-4 pt-5 space-y-5">
+        </header>
+        <ul className="space-y-4 p-4 pt-5">
           {plan.tasks.map((task, index) => {
             const isCompleted = task.status === "completed";
             const isSkipped = task.status === "skipped";
@@ -343,7 +341,7 @@ export default function CaregiverHomePage() {
             }
 
             return (
-              <div 
+              <li 
                 key={task.id} 
                 className={cn(
                   "relative flex items-start gap-4 transition-all duration-200 p-2 rounded-2xl -mx-2 hover:bg-slate-50/50",
@@ -399,11 +397,11 @@ export default function CaregiverHomePage() {
                     )}
                   </div>
                 </div>
-              </div>
+              </li>
             );
           })}
-        </CardContent>
-      </Card>
+        </ul>
+      </section>
 
       <Card>
         <CardHeader className="flex-row items-center justify-between">

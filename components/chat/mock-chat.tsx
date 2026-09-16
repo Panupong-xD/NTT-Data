@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { Bot, Loader2, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ChatMessage } from "@/lib/types";
 import { askAI } from "@/lib/services/ai/client";
@@ -75,56 +74,57 @@ export function MockChat({
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Bot className="h-5 w-5 text-sky-600" />
-          {title}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="max-h-96 space-y-3 overflow-y-auto pr-1 thin-scrollbar">
-          {messages.map((message) => (
-            <div key={message.id} className={message.role === "user" ? "flex justify-end" : "flex justify-start"}>
-              <div
-                className={
-                  message.role === "user"
-                    ? "max-w-[82%] rounded-2xl bg-sky-600 px-4 py-3 text-sm leading-6 text-white"
-                    : "max-w-[86%] rounded-2xl bg-sky-50 px-4 py-3 text-sm leading-6 text-slate-700"
-                }
-              >
-                {message.role === "user" ? (
-                  <p className="whitespace-pre-wrap">{message.content}</p>
-                ) : (
-                  <MarkdownRenderer content={message.content} />
-                )}
-                <p className="mt-1 text-[11px] opacity-70">{message.time}</p>
-              </div>
+    <section className="space-y-4 rounded-2xl border border-sky-100 bg-white/92 p-5 shadow-card backdrop-blur-sm">
+      <header className="flex items-center gap-2">
+        <Bot className="h-5 w-5 text-sky-600" />
+        <h3 className="text-[15px] font-bold tracking-tight text-slate-900">{title}</h3>
+      </header>
+
+      <div className="max-h-96 space-y-3 overflow-y-auto pr-1 thin-scrollbar">
+        {messages.map((message) => (
+          <div key={message.id} className={message.role === "user" ? "flex justify-end" : "flex justify-start"}>
+            <div
+              className={
+                message.role === "user"
+                  ? "max-w-[82%] rounded-2xl bg-sky-600 px-4 py-3 text-sm leading-6 text-white"
+                  : "max-w-[86%] rounded-2xl bg-sky-50 px-4 py-3 text-sm leading-6 text-slate-700"
+              }
+            >
+              {message.role === "user" ? (
+                <p className="whitespace-pre-wrap">{message.content}</p>
+              ) : (
+                <MarkdownRenderer content={message.content} />
+              )}
+              <p className="mt-1 text-[11px] opacity-70">{message.time}</p>
             </div>
-          ))}
-          {thinking ? (
-            <div className="flex justify-start">
-              <div className="flex max-w-[86%] items-center gap-2 rounded-2xl bg-sky-50 px-4 py-3 text-sm font-semibold text-sky-700">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                AI กำลังคิดคำตอบ...
-              </div>
+          </div>
+        ))}
+        {thinking ? (
+          <div className="flex justify-start">
+            <div className="flex max-w-[86%] items-center gap-2 rounded-2xl bg-sky-50 px-4 py-3 text-sm font-semibold text-sky-700">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              AI กำลังคิดคำตอบ...
             </div>
-          ) : null}
-        </div>
-        <div className="flex gap-2">
-          <Input
-            value={value}
-            onChange={(event) => setValue(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") send();
-            }}
-            placeholder="พิมพ์คำถาม..."
-          />
-          <Button size="icon" onClick={send} disabled={thinking} aria-label="ส่งข้อความ">
-            {thinking ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+          </div>
+        ) : null}
+      </div>
+
+      <form
+        className="flex gap-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          send();
+        }}
+      >
+        <Input
+          value={value}
+          onChange={(event) => setValue(event.target.value)}
+          placeholder="พิมพ์คำถาม..."
+        />
+        <Button type="submit" size="icon" disabled={thinking} aria-label="ส่งข้อความ">
+          {thinking ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
+        </Button>
+      </form>
+    </section>
   );
 }
