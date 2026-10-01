@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { MobileShell } from "@/components/layouts/mobile-shell";
 import { useAuth } from "@/lib/hooks/use-auth";
 import { useMockStore } from "@/lib/hooks/use-mock-store";
-import { BedrockSettings } from "@/components/ui/bedrock-settings";
 
 export default function PatientProfilePage() {
   const { logout, user } = useAuth();
@@ -93,9 +92,6 @@ export default function PatientProfilePage() {
         <p className="font-bold text-slate-800">{caregiver?.name}</p>
         <p className="text-sm text-slate-500 mt-0.5">{caregiver?.relationship} · ยืนยันข้อมูลสุขภาพแทนแพทย์ก่อน review</p>
       </section>
-
-      {/* Amazon Bedrock & AWS Serverless Settings */}
-      <BedrockSettings />
 
       <Button 
         className="w-full rounded-2xl bg-gradient-to-r from-rose-500 to-red-600 hover:from-rose-600 hover:to-red-700 text-white shadow-lg hover:shadow-red-500/25 active:scale-[0.98] transition-all duration-300 font-bold border-none py-3 h-12 flex items-center justify-center gap-2" 

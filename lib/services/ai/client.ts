@@ -2,14 +2,10 @@
 
 import { ApprovalEntity } from "@/lib/types";
 
+const DEFAULT_API_BASE_URL = "https://ghvqrsbbdg.execute-api.us-east-1.amazonaws.com";
+
 const getApiBaseUrl = () => {
-  if (typeof window !== "undefined") {
-    const custom = localStorage.getItem("bedrock-api-endpoint");
-    if (custom && custom.trim()) {
-      return custom.trim().replace(/\/+$/, "");
-    }
-  }
-  return (process.env.NEXT_PUBLIC_API_BASE_URL || "").replace(/\/+$/, "");
+  return (process.env.NEXT_PUBLIC_API_BASE_URL || DEFAULT_API_BASE_URL).replace(/\/+$/, "");
 };
 
 /**
@@ -22,18 +18,9 @@ export async function askAI(
 ) {
   const API_BASE_URL = getApiBaseUrl();
 
-  if (!API_BASE_URL) {
-    throw new Error(
-      "ยังไม่ได้เชื่อมต่อ AWS API Gateway Backend!\n\n" +
-      "วิธีแก้ไข:\n" +
-      "1. ไปที่เมนู 'โปรไฟล์' หรือ 'Settings' ในเว็บนี้ แล้วใส่ URL ของ API Gateway ในกล่องตั้งค่า AWS Bedrock\n" +
-      "2. หรือใส่ NEXT_PUBLIC_API_BASE_URL ในไฟล์ .env.local แล้วสั่ง npm run build ใหม่"
-    );
-  }
-
   let targetModel = "amazon.nova-micro-v1:0";
   if (typeof window !== "undefined") {
-    targetModel = localStorage.getItem("bedrock-model") || process.env.NEXT_PUBLIC_BEDROCK_MODEL || "amazon.nova-micro-v1:0";
+    targetModel = process.env.NEXT_PUBLIC_BEDROCK_MODEL || "amazon.nova-micro-v1:0";
   }
 
   // Vision fallback if images provided
@@ -63,16 +50,14 @@ export async function askAI(
     };
 
     if (!response.ok) {
-      throw new Error(payload.error || `AWS Backend ตอบกลับด้วยสถานะ Error (${response.status})`);
+      throw new Error(payload.error || `AWS Backend status: ${response.status}`);
     }
 
     return payload.text || "";
   } catch (error: any) {
-    console.error("[Bedrock Client Gateway Error]:", error);
+    console.error("[Bedrock Client Gateway Error]:", error, `Target: ${API_BASE_URL}/api/ai/chat`);
     throw new Error(
-      `ไม่สามารถเชื่อมต่อ AWS Backend ได้: ${error?.message || "Network Error"}\n\n` +
-      `URL ที่พยายามเรียก: ${API_BASE_URL}/api/ai/chat\n` +
-      `คำแนะนำ: ตรวจสอบว่าได้ deploy sam deploy แล้วหรือยัง และ URL ถูกต้องหรือไม่`
+      "ขออภัยครับ ระบบไม่สามารถเชื่อมต่อผู้ช่วยทางการแพทย์ AI ได้ในขณะนี้ กรุณาลองใหม่อีกครั้ง"
     );
   }
 }
