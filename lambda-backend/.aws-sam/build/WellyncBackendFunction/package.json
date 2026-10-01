@@ -1,0 +1,20 @@
+{
+  "name": "wellync-serverless-backend",
+  "version": "1.0.0",
+  "description": "AWS Serverless Backend for Wellync ($0 Base Cost) - Amazon Bedrock & DynamoDB Single-Table",
+  "main": "handler.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@aws-sdk/client-bedrock-runtime": "^3.700.0",
+    "@aws-sdk/client-dynamodb": "^3.700.0",
+    "@aws-sdk/lib-dynamodb": "^3.700.0"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.146",
+    "@types/node": "^22.10.5",
+    "typescript": "^5.7.2"
+  }
+}

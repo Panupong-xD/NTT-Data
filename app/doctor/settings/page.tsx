@@ -8,6 +8,7 @@ import { DoctorShell } from "@/components/layouts/doctor-shell";
 import { useMockStore } from "@/lib/hooks/use-mock-store";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { BedrockSettings } from "@/components/ui/bedrock-settings";
 
 export default function DoctorSettingsPage() {
   const { db, setDb } = useMockStore();
@@ -135,6 +136,7 @@ export default function DoctorSettingsPage() {
 
         {/* Right Column: Connection and Simulated Cloud Systems */}
         <div className="space-y-6">
+          <BedrockSettings />
           {/* Notifications config */}
           <Card>
             <CardHeader>

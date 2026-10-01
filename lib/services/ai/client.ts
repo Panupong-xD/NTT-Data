@@ -2,7 +2,15 @@
 
 import { ApprovalEntity } from "@/lib/types";
 
-const getApiBaseUrl = () => process.env.NEXT_PUBLIC_API_BASE_URL || "";
+const getApiBaseUrl = () => {
+  if (typeof window !== "undefined") {
+    const custom = localStorage.getItem("bedrock-api-endpoint");
+    if (custom && custom.trim()) {
+      return custom.trim().replace(/\/+$/, "");
+    }
+  }
+  return (process.env.NEXT_PUBLIC_API_BASE_URL || "").replace(/\/+$/, "");
+};
 
 /**
  * Ask Amazon Bedrock Agent via AWS API Gateway
@@ -13,6 +21,15 @@ export async function askAI(
   options?: { sessionId?: string; patientId?: string; isCritical?: boolean }
 ) {
   const API_BASE_URL = getApiBaseUrl();
+
+  if (!API_BASE_URL) {
+    throw new Error(
+      "ยังไม่ได้เชื่อมต่อ AWS API Gateway Backend!\n\n" +
+      "วิธีแก้ไข:\n" +
+      "1. ไปที่เมนู 'โปรไฟล์' หรือ 'Settings' ในเว็บนี้ แล้วใส่ URL ของ API Gateway ในกล่องตั้งค่า AWS Bedrock\n" +
+      "2. หรือใส่ NEXT_PUBLIC_API_BASE_URL ในไฟล์ .env.local แล้วสั่ง npm run build ใหม่"
+    );
+  }
 
   let targetModel = "amazon.nova-micro-v1:0";
   if (typeof window !== "undefined") {
@@ -46,14 +63,17 @@ export async function askAI(
     };
 
     if (!response.ok) {
-      throw new Error(payload.error || `AI Request Failed (${response.status})`);
+      throw new Error(payload.error || `AWS Backend ตอบกลับด้วยสถานะ Error (${response.status})`);
     }
 
     return payload.text || "";
-  } catch (error) {
-    console.warn("[Bedrock Client Gateway Fallback]:", error);
-    // Offline / Local Simulation fallback
-    return `[Wellync AI Clinical Agent]\n\nได้รับข้อมูลสุขภาพแล้ว: "${content.slice(0, 90)}..."\n\nระบบประเมินค่าสัญญาณชีพอยู่ในเกณฑ์เฝ้าระวัง กรุณาปฏิบัติตามแผนการดูแลอย่างสม่ำเสมอ`;
+  } catch (error: any) {
+    console.error("[Bedrock Client Gateway Error]:", error);
+    throw new Error(
+      `ไม่สามารถเชื่อมต่อ AWS Backend ได้: ${error?.message || "Network Error"}\n\n` +
+      `URL ที่พยายามเรียก: ${API_BASE_URL}/api/ai/chat\n` +
+      `คำแนะนำ: ตรวจสอบว่าได้ deploy sam deploy แล้วหรือยัง และ URL ถูกต้องหรือไม่`
+    );
   }
 }
 
