@@ -97,11 +97,11 @@ In strict compliance with Personal Data Protection principles:
 
 ### AI-Powered Health Tools
 
-The platform integrates with large language models through the SWU AI Gateway (supporting openai/gpt-5.6-luna and related models), with a built-in fallback simulation layer:
+The platform integrates with large language models through **Amazon Bedrock** (supporting Amazon Nova Micro for budget-optimized continuous chat and Claude 3.5 Haiku/Sonnet for critical evaluations), with built-in sliding window and rolling summary optimization:
 
 - Vision OCR for medical device screens.
 - Food nutrient and suitability analysis.
-- Real-time patient and caregiver conversational agents.
+- Real-time patient and caregiver conversational agents with Human-in-the-Loop approval workflows.
 - Automated clinical care plan drafting for physicians.
 
 ### Caregiver Strain Monitoring (MCSI)
@@ -191,15 +191,13 @@ Copy the example environment configuration file:
 cp .env.example .env.local
 ```
 
-Configure `.env.local` with your SWU AI credentials (optional for local mock mode, required for live AI responses):
+Configure `.env.local` with your AWS Serverless API Gateway URL:
 
 ```env
-NEXT_PUBLIC_SWU_API_KEY=your_swu_api_key_here
-NEXT_PUBLIC_SWU_USER_ID=your_swu_user_id_here
-NEXT_PUBLIC_SWU_MODEL=openai/gpt-5.6-luna
+NEXT_PUBLIC_API_BASE_URL=https://<api-id>.execute-api.us-east-1.amazonaws.com
+NEXT_PUBLIC_BEDROCK_MODEL=amazon.nova-micro-v1:0
+NEXT_PUBLIC_AWS_REGION=us-east-1
 ```
-
-Note: SWU AI credentials can also be configured directly in the application UI under the Profile or Doctor Settings pages without editing the `.env.local` file.
 
 ### Development Server
 
@@ -211,27 +209,24 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000) in your web browser.
 
-### Building for Production
+### Building for Production (Static Export for S3 + CloudFront)
 
-To create an optimized production build:
+To create an optimized production build exported to the `out` directory:
 
 ```bash
 npm run build
-npm run start
 ```
 
 ---
 
-## SWU AI Gateway Configuration
+## AWS Serverless Backend Deployment (AWS SAM)
 
-When connecting to the SWU AI Gateway from outside the university intranet:
-
-1. Ensure you are connected to the campus VPN or university network.
-2. If encountering Cloudflare CORS verification on local browsers, you can use the included helper script to launch an isolated Chrome instance:
+To deploy the Pure Serverless Backend ($0 Base Cost) including Amazon DynamoDB Single-Table (`HealthcareAgentTable`) and Amazon Bedrock integration:
 
 ```bash
-chmod +x run-chrome-no-cors.sh
-./run-chrome-no-cors.sh
+cd lambda-backend
+sam build
+sam deploy --guided
 ```
 
 ---

@@ -138,6 +138,23 @@ export interface EarlyWarning {
   createdAt: string;
 }
 
+export interface ApprovalEntity {
+  actionId: string;
+  patientId: string;
+  patientName: string;
+  type: "medication-change" | "urgent-visit" | "care-plan-update" | "alert-escalation";
+  title: string;
+  description: string;
+  clinicalReason: string;
+  suggestedAction: string;
+  confidence: number;
+  status: "PENDING" | "APPROVED" | "REJECTED";
+  createdAt: string;
+  reviewedAt?: string;
+  reviewedBy?: string;
+  reviewNote?: string;
+}
+
 export interface AgentAction {
   id: string;
   type: "care-plan-update" | "vital-check-reminder" | "medication-alert" | "diet-adjustment";

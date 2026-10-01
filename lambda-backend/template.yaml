@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: Wellync Serverless Backend ($0 Base Cost) - AWS Lambda & Amazon Bedrock
+Description: Wellync Serverless Backend ($0 Base Cost) - DynamoDB Single-Table + Amazon Bedrock + AWS Lambda
 
 Globals:
   Function:
@@ -11,6 +11,32 @@ Globals:
       - arm64
 
 Resources:
+  # 1. DynamoDB Single-Table (On-Demand Mode = $0 Base Cost)
+  HealthcareAgentTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: HealthcareAgentTable
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+      Tags:
+        - Key: Project
+          Value: Wellync
+        - Key: Environment
+          Value: Production
+
+  # 2. HTTP API Gateway with CORS
   WellyncHttpApi:
     Type: AWS::Serverless::HttpApi
     Properties:
@@ -20,11 +46,15 @@ Resources:
         AllowMethods:
           - GET
           - POST
+          - PUT
+          - DELETE
           - OPTIONS
         AllowHeaders:
           - Content-Type
           - Authorization
+          - X-Requested-With
 
+  # 3. Main Agentic Backend Function
   WellyncBackendFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -32,13 +62,19 @@ Resources:
       Handler: handler.handler
       Environment:
         Variables:
-          BEDROCK_MODEL_ID: anthropic.claude-3-5-sonnet-20241022-v2:0
+          DYNAMODB_TABLE: !Ref HealthcareAgentTable
+          BEDROCK_CHEAP_MODEL: amazon.nova-micro-v1:0
+          AWS_NODEJS_CONNECTION_REUSE_ENABLED: '1'
       Policies:
+        # Permission to Invoke Amazon Bedrock Models
         - Statement:
             - Effect: Allow
               Action:
                 - bedrock:InvokeModel
               Resource: '*'
+        # Permission for DynamoDB Single-Table
+        - DynamoDBCrudPolicy:
+            TableName: !Ref HealthcareAgentTable
       Events:
         ProxyApi:
           Type: HttpApi
@@ -57,3 +93,6 @@ Outputs:
   ApiEndpoint:
     Description: "HTTP API Gateway endpoint URL ($0 Base Cost)"
     Value: !Sub "https://${WellyncHttpApi}.execute-api.${AWS::Region}.amazonaws.com"
+  DynamoDBTableName:
+    Description: "DynamoDB Single-Table Name"
+    Value: !Ref HealthcareAgentTable
