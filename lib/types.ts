@@ -138,11 +138,26 @@ export interface EarlyWarning {
   createdAt: string;
 }
 
+export interface AgentAction {
+  id: string;
+  type: "care-plan-update" | "vital-check-reminder" | "medication-alert" | "diet-adjustment";
+  title: string;
+  description: string;
+  proposedBy: string;
+  confidence: number;
+  status: "pending" | "approved" | "rejected";
+  timestamp: string;
+  reviewedAt?: string;
+  decisionNote?: string;
+}
+
 export interface ChatMessage {
   id: string;
   role: "user" | "assistant";
   content: string;
   time: string;
+  planningSteps?: string[];
+  agentAction?: AgentAction;
 }
 
 export interface MockDatabase {

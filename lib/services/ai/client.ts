@@ -64,8 +64,10 @@ export async function askAI(content: string, files?: Array<{ type: string; name:
     }
   }
 
-  // 2. Fallback to server-side route
-  const response = await fetch("/api/ai/chat", {
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
+
+  // 2. Fallback to server-side or AWS API Gateway route
+  const response = await fetch(`${API_BASE_URL}/api/ai/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ content, model: targetModel, apiKey, userId, files })
@@ -110,8 +112,10 @@ export async function getAvailableModels(apiKey?: string, userId?: string) {
     }
   }
 
-  // 2. Fallback to server-side route
-  const response = await fetch("/api/ai/models", {
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
+
+  // 2. Fallback to server-side or AWS API Gateway route
+  const response = await fetch(`${API_BASE_URL}/api/ai/models`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ apiKey: key, userId: uid })
@@ -123,4 +127,21 @@ export async function getAvailableModels(apiKey?: string, userId?: string) {
   }
 
   return (await response.json()) as { configured: boolean; models: string[] | Record<string, unknown> };
+}
+
+export async function submitAgentAction(actionId: string, decision: "approved" | "rejected", note?: string) {
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/agent/action`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ actionId, decision, note, timestamp: new Date().toISOString() })
+    });
+    if (response.ok) {
+      return await response.json();
+    }
+  } catch (error) {
+    console.warn("Agent action API call failed, fell back to local state:", error);
+  }
+  return { success: true, actionId, decision, local: true };
 }

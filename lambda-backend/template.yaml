@@ -1,0 +1,59 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Wellync Serverless Backend ($0 Base Cost) - AWS Lambda & Amazon Bedrock
+
+Globals:
+  Function:
+    Timeout: 30
+    MemorySize: 512
+    Runtime: nodejs20.x
+    Architectures:
+      - arm64
+
+Resources:
+  WellyncHttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      CorsConfiguration:
+        AllowOrigins:
+          - '*'
+        AllowMethods:
+          - GET
+          - POST
+          - OPTIONS
+        AllowHeaders:
+          - Content-Type
+          - Authorization
+
+  WellyncBackendFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: handler.handler
+      Environment:
+        Variables:
+          BEDROCK_MODEL_ID: anthropic.claude-3-5-sonnet-20241022-v2:0
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - bedrock:InvokeModel
+              Resource: '*'
+      Events:
+        ProxyApi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WellyncHttpApi
+            Path: /{proxy+}
+            Method: ANY
+        RootApi:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WellyncHttpApi
+            Path: /
+            Method: ANY
+
+Outputs:
+  ApiEndpoint:
+    Description: "HTTP API Gateway endpoint URL ($0 Base Cost)"
+    Value: !Sub "https://${WellyncHttpApi}.execute-api.${AWS::Region}.amazonaws.com"
