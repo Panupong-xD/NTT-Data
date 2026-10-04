@@ -1,22 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import { 
-  Bot, 
-  Loader2, 
-  Send, 
-  CheckCircle2, 
-  XCircle, 
-  Sparkles, 
-  Workflow, 
-  ShieldCheck, 
-  Clock, 
-  ChevronDown, 
-  ChevronUp 
-} from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Loader2, Send, CheckCircle2, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { HealthCharm } from "@/components/mobile/health-charm";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { ChatMessage, AgentAction } from "@/lib/types";
 import { askAI, submitAgentAction } from "@/lib/services/ai/client";
 import { MarkdownRenderer } from "@/components/ui/markdown-renderer";
@@ -36,12 +24,8 @@ export function MockChat({
   const [messages, setMessages] = useState<ChatMessage[]>(seedMessages);
   const [value, setValue] = useState("");
   const [thinking, setThinking] = useState(false);
-  const [agentPlanningStep, setAgentPlanningStep] = useState<string | null>(null);
-  const [expandedSteps, setExpandedSteps] = useState<Record<string, boolean>>({});
-
-  function toggleStep(id: string) {
-    setExpandedSteps((prev) => ({ ...prev, [id]: !prev[id] }));
-  }
+  const bottomRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { if (messages.length > seedMessages.length || thinking) bottomRef.current?.scrollIntoView({ behavior: "auto", block: "nearest" }); }, [messages.length, seedMessages.length, thinking]);
 
   async function handleActionDecision(messageId: string, action: AgentAction, decision: "approved" | "rejected") {
     const reviewedAt = new Intl.DateTimeFormat("th-TH", { hour: "2-digit", minute: "2-digit" }).format(new Date());
@@ -67,13 +51,9 @@ export function MockChat({
     await submitAgentAction(action.id, decision);
 
     if (decision === "approved") {
-      toast.success(`อนุมัติคำสั่ง "${action.title}" เรียบร้อยแล้ว`, {
-        description: "ระบบได้นำแผนปฏิบัติการของ AI ไปปรับใช้ในตารางการดูแลแล้ว"
-      });
+      toast.success("รับข้อเสนอแนะแล้ว");
     } else {
-      toast.info(`ปฏิเสธคำสั่ง "${action.title}"`, {
-        description: "ระบบยกเลิกคำสั่งตามการตัดสินใจของผู้ใช้งาน (Human-in-the-Loop)"
-      });
+      toast.info("ข้ามข้อเสนอแนะแล้ว");
     }
   }
 
@@ -88,15 +68,8 @@ export function MockChat({
     setValue("");
     setThinking(true);
 
-    // Simulate Agentic Planning lifecycle
-    setAgentPlanningStep("1. ตรวจสอบบริบทผู้ป่วยและสัญญาณชีพ (Perceiving Vitals)...");
-    await new Promise((r) => setTimeout(r, 450));
-    setAgentPlanningStep("2. วิเคราะห์แนวทางเวชปฏิบัติและวางแผนงาน (Planning Strategy)...");
-    await new Promise((r) => setTimeout(r, 450));
-    setAgentPlanningStep("3. ประมวลผลคำตอบพร้อมตรวจสอบความปลอดภัยทางคลินิก (Synthesizing)...");
-
     try {
-      const answer = await askAI(userQuestion);
+      const answer = await askAI(`${context ? `บริบทสุขภาพ: ${context}\n` : ""}คำถาม: ${userQuestion}`);
 
       // Check if action proposal should be synthesized for Human-in-the-Loop criteria
       const isActionOriented = 
@@ -111,20 +84,14 @@ export function MockChat({
         ? {
             id: `act-${Date.now()}`,
             type: "care-plan-update",
-            title: mode === "patient" ? "เพิ่มกิจกรรมดูแลสุขภาพลงใน Checklist ประจำวัน" : "ส่งการแจ้งเตือนและปรับเกณฑ์เฝ้าระวังผู้ป่วย",
-            description: `AI ขอเสนอแนะให้เพิ่มมาตรการ: บันทึกค่าวัดและติดตามผลตามคำแนะนำข้างต้น เพื่อให้แพทย์ประเมินผลได้แม่นยำ`,
+            title: "บันทึกและติดตามตามคำแนะนำ",
+            description: "เก็บบันทึกสุขภาพอย่างต่อเนื่อง เพื่อให้แพทย์เห็นแนวโน้ม",
             proposedBy: "Amazon Bedrock / GPT-5.6 Agent",
             confidence: 0.94,
             status: "pending",
             timestamp: now
           }
         : undefined;
-
-      const steps = [
-        "รับข้อมูลและระบุหมวดหมู่คำถามจากผู้ใช้",
-        "เปรียบเทียบค่าความดัน/น้ำตาลกับเกณฑ์มาตรฐานสากล (AHA/ADA)",
-        "สร้างคำแนะนำเฉพาะบุคคลและร่างข้อเสนอแนะที่ต้องการคำอนุมัติ (HITL)"
-      ];
 
       setMessages((current) => [
         ...current,
@@ -133,7 +100,6 @@ export function MockChat({
           role: "assistant", 
           content: answer, 
           time: now,
-          planningSteps: steps,
           agentAction: generatedAction
         }
       ]);
@@ -144,163 +110,31 @@ export function MockChat({
           id: assistantMsgId,
           role: "assistant",
           content:
-            error instanceof Error
-              ? `เรียกใช้งาน AI ไม่สำเร็จ: ${error.message}`
-              : "เรียกใช้งาน AI ไม่สำเร็จ",
+            "ผู้ช่วยยังไม่พร้อม ลองถามใหม่อีกครั้งนะ",
           time: now
         }
       ]);
     } finally {
       setThinking(false);
-      setAgentPlanningStep(null);
+
     }
   }
 
-  return (
-    <section className="space-y-4 rounded-2xl border border-sky-100 bg-white/95 p-5 shadow-card backdrop-blur-sm">
-      <header className="flex items-center justify-between pb-2 border-b border-slate-100">
-        <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-sky-50 text-sky-600">
-            <Bot className="h-5 w-5" />
-          </div>
-          <div>
-            <h3 className="text-sm font-bold tracking-tight text-slate-900">{title}</h3>
-            <p className="text-[10px] text-slate-400 font-medium">Agentic Core · Human-in-the-Loop Protected</p>
-          </div>
+  const prompts = mode === "patient" ? ["วันนี้ควรดูแลตัวเองยังไง?", "ช่วยวางแผนมื้ออาหาร"] : ["ช่วยจัดตารางดูแล", "เวลาฉันเหนื่อย ควรทำยังไง?"];
+  return <section>
+    <header className="relative mb-5 flex min-h-[130px] items-center overflow-hidden rounded-[30px_30px_40px_24px] bg-[#e9f3ff] p-5"><div className="relative z-10"><h2 className="text-2xl font-bold">{title}</h2><p className="mt-1 text-xs text-slate-500">อยากรู้เรื่องไหน ถามได้เลย</p></div><HealthCharm className="mobile-float absolute -right-3 -top-1 h-32 w-32 opacity-75"/></header>
+    <div className="max-h-[440px] space-y-5 overflow-y-auto pb-3 pr-1 thin-scrollbar" aria-live="polite" aria-relevant="additions">
+      {messages.map(message=><div key={message.id} className={message.role==="user"?"flex justify-end":"flex flex-col items-start"}>
+        <div className={message.role==="user"?"max-w-[85%] rounded-[22px_22px_6px_22px] bg-sky-100 px-4 py-3 text-sm leading-7 text-sky-950":"w-full px-1 text-sm leading-7 text-slate-700"}>
+          {message.role==="user"?<p className="whitespace-pre-wrap">{message.content}</p>:<MarkdownRenderer content={message.content}/>}
+          {message.agentAction&&<details className="group mt-4 border-t border-slate-200/60 pt-1"><summary className="flex min-h-11 items-center justify-between text-xs font-semibold text-sky-700">ข้อเสนอแนะเพิ่มเติม<ChevronDown className="h-4 w-4 group-open:rotate-180"/></summary><div className="pb-3"><p className="text-sm font-semibold">{message.agentAction.title}</p><p className="mt-1 text-xs leading-6 text-slate-500">{message.agentAction.description}</p>{message.agentAction.status==="pending"?<div className="mt-3 flex gap-2"><Button size="sm" className="min-h-11 rounded-full" onClick={()=>handleActionDecision(message.id,message.agentAction!,"approved")}><CheckCircle2 className="h-4 w-4"/>รับข้อเสนอ</Button><Button size="sm" variant="ghost" className="min-h-11 rounded-full" onClick={()=>handleActionDecision(message.id,message.agentAction!,"rejected")}>ข้าม</Button></div>:<p className="mt-2 text-xs text-slate-500">{message.agentAction.status==="approved"?"รับข้อเสนอแล้ว":"ข้ามแล้ว"} · {message.agentAction.reviewedAt}</p>}</div></details>}
+          <p className="mt-2 text-[10px] text-slate-400">{message.time}</p>
         </div>
-        <Badge tone="green" className="text-[10px] px-2 py-0.5">
-          <ShieldCheck className="h-3 w-3 mr-1" />
-          HITL Enabled
-        </Badge>
-      </header>
-
-      <div className="max-h-96 space-y-3.5 overflow-y-auto pr-1 thin-scrollbar">
-        {messages.map((message) => (
-          <div key={message.id} className={message.role === "user" ? "flex justify-end" : "flex flex-col items-start gap-2"}>
-            <div
-              className={
-                message.role === "user"
-                  ? "max-w-[82%] rounded-2xl bg-sky-600 px-4 py-3 text-sm leading-6 text-white"
-                  : "max-w-[90%] rounded-2xl bg-slate-50 border border-slate-100 px-4 py-3 text-sm leading-6 text-slate-700 space-y-2.5"
-              }
-            >
-              {message.role === "user" ? (
-                <p className="whitespace-pre-wrap">{message.content}</p>
-              ) : (
-                <MarkdownRenderer content={message.content} />
-              )}
-              
-              {/* Agent Planning Steps Accordion */}
-              {message.planningSteps && message.planningSteps.length > 0 && (
-                <div className="mt-2 pt-2 border-t border-slate-200/70 text-xs">
-                  <button
-                    type="button"
-                    onClick={() => toggleStep(message.id)}
-                    className="flex items-center gap-1.5 text-sky-700 font-semibold hover:underline cursor-pointer"
-                  >
-                    <Workflow className="h-3.5 w-3.5" />
-                    <span>ขั้นตอนการคิดของ Agent ({message.planningSteps.length} ขั้นตอน)</span>
-                    {expandedSteps[message.id] ? (
-                      <ChevronUp className="h-3 w-3 ml-auto" />
-                    ) : (
-                      <ChevronDown className="h-3 w-3 ml-auto" />
-                    )}
-                  </button>
-                  {expandedSteps[message.id] && (
-                    <ul className="mt-2 space-y-1 pl-5 list-disc text-slate-600 text-[11px] bg-white/70 p-2 rounded-lg border border-slate-100">
-                      {message.planningSteps.map((step, idx) => (
-                        <li key={idx}>{step}</li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              )}
-
-              {/* Human-in-the-Loop Action Proposal Card */}
-              {message.agentAction && (
-                <div className="mt-3 rounded-xl border border-sky-200 bg-sky-50/70 p-3 text-xs space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="flex items-center gap-1 font-bold text-sky-900">
-                      <Sparkles className="h-3.5 w-3.5 text-amber-500" />
-                      ข้อเสนอแนะที่รอการอนุมัติ (Human-in-the-Loop)
-                    </span>
-                    <span className="text-[10px] text-slate-400">
-                      ความมั่นใจ {(message.agentAction.confidence * 100).toFixed(0)}%
-                    </span>
-                  </div>
-
-                  <p className="font-semibold text-slate-800">{message.agentAction.title}</p>
-                  <p className="text-slate-600 text-[11px] leading-relaxed">{message.agentAction.description}</p>
-
-                  <div className="pt-2 flex items-center gap-2">
-                    {message.agentAction.status === "pending" ? (
-                      <>
-                        <Button
-                          size="sm"
-                          variant="success"
-                          className="h-7 text-xs font-bold px-3 gap-1 shadow-sm"
-                          onClick={() => handleActionDecision(message.id, message.agentAction!, "approved")}
-                        >
-                          <CheckCircle2 className="h-3.5 w-3.5" />
-                          อนุมัติ (Approve)
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-7 text-xs font-bold px-3 gap-1 text-slate-600 border-slate-300 hover:bg-slate-100"
-                          onClick={() => handleActionDecision(message.id, message.agentAction!, "rejected")}
-                        >
-                          <XCircle className="h-3.5 w-3.5" />
-                          ปฏิเสธ (Reject)
-                        </Button>
-                      </>
-                    ) : message.agentAction.status === "approved" ? (
-                      <div className="flex items-center gap-1.5 text-emerald-700 font-bold text-xs bg-emerald-100/70 px-2.5 py-1 rounded-md">
-                        <CheckCircle2 className="h-3.5 w-3.5" />
-                        อนุมัติแล้วเมื่อ {message.agentAction.reviewedAt}
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-1.5 text-rose-700 font-bold text-xs bg-rose-100/70 px-2.5 py-1 rounded-md">
-                        <XCircle className="h-3.5 w-3.5" />
-                        ปฏิเสธแล้วเมื่อ {message.agentAction.reviewedAt}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              <p className="mt-1 text-[10px] text-slate-400">{message.time}</p>
-            </div>
-          </div>
-        ))}
-
-        {thinking && (
-          <div className="flex flex-col items-start gap-1">
-            <div className="flex max-w-[88%] items-center gap-2 rounded-2xl bg-sky-50 px-4 py-3 text-xs font-semibold text-sky-800 border border-sky-100 animate-pulse">
-              <Loader2 className="h-4 w-4 animate-spin text-sky-600" />
-              <span>{agentPlanningStep || "AI กำลังคิดคำตอบ..."}</span>
-            </div>
-          </div>
-        )}
-      </div>
-
-      <form
-        className="flex gap-2"
-        onSubmit={(e) => {
-          e.preventDefault();
-          send();
-        }}
-      >
-        <Input
-          value={value}
-          onChange={(event) => setValue(event.target.value)}
-          placeholder="พิมพ์คำถาม หรือสั่งให้ AI วางแผนการดูแล..."
-          disabled={thinking}
-        />
-        <Button type="submit" size="icon" disabled={thinking || !value.trim()} aria-label="ส่งข้อความ">
-          {thinking ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
-        </Button>
-      </form>
-    </section>
-  );
+      </div>)}
+      {thinking&&<div role="status" className="flex items-center gap-2 px-1 text-sm text-sky-700"><span className="flex gap-1" aria-hidden="true"><span className="h-1.5 w-1.5 animate-bounce rounded-full bg-sky-400"/><span className="h-1.5 w-1.5 animate-bounce rounded-full bg-sky-400 [animation-delay:150ms]"/><span className="h-1.5 w-1.5 animate-bounce rounded-full bg-sky-400 [animation-delay:300ms]"/></span>กำลังคิดคำตอบ…</div>}
+      <div ref={bottomRef}/>
+    </div>
+    {messages.length===seedMessages.length&&<div className="my-4 flex flex-wrap gap-2">{prompts.map(prompt=><button key={prompt} type="button" onClick={()=>setValue(prompt)} className="min-h-11 rounded-full bg-white px-3 text-xs text-sky-700">{prompt}</button>)}</div>}
+    <form className="mt-4 flex gap-2 rounded-[22px] bg-white p-2" onSubmit={e=>{e.preventDefault();send();}}><label className="sr-only" htmlFor={`chat-${mode}`}>คำถามถึงผู้ช่วย</label><Input id={`chat-${mode}`} value={value} onChange={e=>setValue(e.target.value)} placeholder="อยากถามอะไรวันนี้?" disabled={thinking} className="min-w-0 flex-1 border-0 bg-transparent shadow-none"/><Button type="submit" size="icon" className="h-12 w-12 shrink-0 rounded-full" disabled={thinking||!value.trim()} aria-label="ส่งข้อความ">{thinking?<Loader2 className="h-5 w-5 animate-spin"/>:<Send className="h-5 w-5"/>}</Button></form>
+  </section>;
 }

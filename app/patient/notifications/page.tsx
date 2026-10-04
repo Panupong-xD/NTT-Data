@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect } from "react";
-import { Bell, Check, X } from "lucide-react";
+import { Check, X } from "lucide-react";
+import { NotificationFeed } from "@/components/mobile/notification-feed";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { MobileShell } from "@/components/layouts/mobile-shell";
 import { useMockStore } from "@/lib/hooks/use-mock-store";
 import { updateConsentStatus } from "@/lib/services/mock-store";
@@ -37,59 +37,9 @@ export default function PatientNotificationsPage() {
 
   return (
     <MobileShell role="patient" title="แจ้งเตือน">
-      <section className="rounded-3xl border bg-white p-6 shadow-card">
-        <header className="mb-4">
-          <h3 className="text-lg font-bold text-slate-900">คำขอเข้าถึงจากโรงพยาบาล</h3>
-        </header>
-        <div className="space-y-3">
-          {consents.map((consent) => (
-            <div key={consent.id} className="rounded-2xl bg-sky-50 p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="flex items-center gap-2">
-                    {consent.status === "waiting" && (
-                      <span className="h-2 w-2 rounded-full bg-rose-500 shrink-0" />
-                    )}
-                    <p className="font-bold">{consent.hospital}</p>
-                  </div>
-                  <p className="mt-1 text-sm leading-6 text-slate-600">{consent.reason}</p>
-                </div>
-                <Badge tone={consent.status === "approved" ? "green" : consent.status === "rejected" ? "red" : "yellow"}>
-                  {consent.status === "approved" ? "อนุมัติแล้ว" : consent.status === "rejected" ? "ปฏิเสธแล้ว" : "รออนุมัติ"}
-                </Badge>
-              </div>
-              {consent.status === "waiting" ? (
-                <div className="mt-3 grid grid-cols-2 gap-2">
-                  <Button variant="success" onClick={() => setDb((current) => updateConsentStatus(current, consent.id, "approved"))}><Check className="h-4 w-4" /> อนุมัติ</Button>
-                  <Button variant="outline" onClick={() => setDb((current) => updateConsentStatus(current, consent.id, "rejected"))}><X className="h-4 w-4" /> ปฏิเสธ</Button>
-                </div>
-              ) : null}
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <ul className="space-y-3">
-        {notifications.map((item) => (
-          <li key={item.id}>
-            <article className="flex gap-3 rounded-2xl border bg-white p-4 shadow-card">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-sky-50 text-sky-700">
-                <Bell className="h-5 w-5" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  {!item.read && (
-                    <span className="h-2 w-2 rounded-full bg-rose-500 shrink-0 animate-pulse" />
-                  )}
-                  <p className="font-bold text-slate-900">{item.title}</p>
-                </div>
-                <p className="mt-1 text-sm leading-6 text-slate-500">{item.message}</p>
-                <p className="mt-2 text-xs font-semibold text-sky-700">{formatThaiDate(item.date)}</p>
-              </div>
-            </article>
-          </li>
-        ))}
-      </ul>
+      {consents.some(c=>c.status==="waiting") && <section className="care-sheet p-5"><h2 className="mobile-section-title">คำขอเข้าถึงข้อมูล</h2><div className="mt-3 divide-y divide-slate-100">{consents.filter(c=>c.status==="waiting").map(consent=><div key={consent.id} className="py-3"><p className="text-sm font-semibold">{consent.hospital}</p><p className="mt-1 text-sm leading-6 text-slate-500">{consent.reason}</p><div className="mt-4 grid grid-cols-2 gap-2"><Button className="rounded-full" onClick={()=>setDb(updateConsentStatus(db,consent.id,"approved"))}><Check className="h-4 w-4"/>อนุญาต</Button><Button variant="outline" className="rounded-full" onClick={()=>setDb(updateConsentStatus(db,consent.id,"rejected"))}><X className="h-4 w-4"/>ไม่อนุญาต</Button></div></div>)}</div></section>}
+      <NotificationFeed items={notifications}/>
+      {consents.some(c=>c.status!=="waiting") && <details className="px-1"><summary className="min-h-11 text-sm font-medium text-slate-500">ประวัติความยินยอม</summary><ul className="mt-3 divide-y divide-slate-200/60">{consents.filter(c=>c.status!=="waiting").map(c=><li key={c.id} className="py-3"><p className="text-sm font-medium">{c.hospital}</p><p className="mt-1 text-xs text-slate-500">{c.status==="approved"?"อนุญาตแล้ว":"ไม่อนุญาต"} · {formatThaiDate(c.date)}</p></li>)}</ul></details>}
     </MobileShell>
   );
 }

@@ -53,33 +53,16 @@ export function HospitalCampaignCarousel() {
     };
   }, []);
 
-  // Autoplay / Auto-slide effect
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (containerRef.current) {
-        const nextIndex = (activeIndex + 1) % CAMPAIGNS.length;
-        const width = containerRef.current.clientWidth;
-        containerRef.current.scrollTo({
-          left: nextIndex * width,
-          behavior: "smooth"
-        });
-        setActiveIndex(nextIndex);
-      }
-    }, 4500); // auto slide every 4.5 seconds
-
-    return () => clearInterval(interval);
-  }, [activeIndex]);
-
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between px-1">
-        <h3 className="text-sm font-extrabold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-          <Sparkles className="h-4 w-4 text-sky-600 animate-pulse" />
-          ข่าวสารและแคมเปญพิเศษจากโรงพยาบาล
+        <h3 className="text-base font-bold text-slate-800 flex items-center gap-1.5">
+          <Sparkles className="h-4 w-4 text-sky-600" />
+          ข่าวจากโรงพยาบาล
         </h3>
       </div>
 
-      {/* Swipable Autoplay Row */}
+      {/* Swipeable news row */}
       <div
         ref={containerRef}
         className="flex overflow-x-auto snap-x snap-mandatory scroll-smooth scrollbar-none rounded-3xl"
@@ -117,10 +100,10 @@ export function HospitalCampaignCarousel() {
               }
             }}
             className={cn(
-              "h-1.5 rounded-full transition-all duration-300",
-              activeIndex === i ? "w-4 bg-sky-600" : "w-1.5 bg-slate-200"
+              "relative h-11 w-8 rounded-full transition-all duration-300 after:absolute after:inset-x-2 after:top-5 after:h-1.5 after:rounded-full",
+              activeIndex === i ? "after:bg-sky-600" : "after:bg-slate-200"
             )}
-            aria-label={`Go to slide ${i + 1}`}
+            aria-label={`ดูข่าวที่ ${i + 1}`}
           />
         ))}
       </div>

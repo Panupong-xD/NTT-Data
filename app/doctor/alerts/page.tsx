@@ -100,7 +100,7 @@ export default function DoctorAlertsPage() {
             );
           })}
         </div>
-        <EarlyWarningCard warning={alerts[0] ?? db.earlyWarnings[0]} />
+        <EarlyWarningCard warning={alerts[0] ?? db.earlyWarnings[0]} showClinicalDetails />
       </div>
     </DoctorShell>
   );

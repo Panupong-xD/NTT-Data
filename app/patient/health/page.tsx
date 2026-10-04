@@ -1,15 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Camera, CheckCircle2, HeartPulse, Loader2, Plus, Trash2, Upload, Utensils, X } from "lucide-react";
+import { Camera, CheckCircle2, Loader2, Trash2, Upload, Utensils, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MobileShell } from "@/components/layouts/mobile-shell";
-import { AdherenceChart, MultiMetricChart, TrendChart, DoctorChartsGrid } from "@/components/health/charts";
+import { MobileHealthChart } from "@/components/mobile/health-chart";
+import { HealthCharm } from "@/components/mobile/health-charm";
 import { MockChat } from "@/components/chat/mock-chat";
 import { useMockStore } from "@/lib/hooks/use-mock-store";
 import { addHealthRecord, deleteHealthRecord } from "@/lib/services/mock-store";
@@ -50,7 +49,7 @@ function compressAndResizeImage(file: File, maxWidth = 800, maxHeight = 800, qua
           return;
         }
         ctx.drawImage(img, 0, 0, width, height);
-        
+
         // Convert to base64 jpeg with compression quality (0.7)
         const base64 = canvas.toDataURL("image/jpeg", quality);
         resolve(base64);
@@ -92,13 +91,18 @@ export default function PatientHealthPage() {
     recommendation: string;
   }
 
+  const [activeTab, setActiveTab] = useState("records");
+  useEffect(() => {
+    const tab = new URLSearchParams(window.location.search).get("tab");
+    if (tab && ["records", "charts", "food", "ai"].includes(tab)) setActiveTab(tab);
+  }, []);
   const [scannerReady, setScannerReady] = useState(false);
   const [scannerLoading, setScannerLoading] = useState(false);
   const [foodAnalysis, setFoodAnalysis] = useState<FoodAnalysis | null>(null);
   const [foodImage, setFoodImage] = useState<string | null>(null);
   const [foodNameInput, setFoodNameInput] = useState("");
   const [foodFilesPayload, setFoodFilesPayload] = useState<Array<{ type: string; name: string; data: string }>>([]);
-  
+
   const [form, setForm] = useState({
     systolic: String(latest.systolic),
     diastolic: String(latest.diastolic),
@@ -239,7 +243,7 @@ export default function PatientHealthPage() {
             next.systolic = String(result.systolic);
             next.diastolic = String(result.diastolic);
             fillMsg.push(`ความดันโลหิต ${result.systolic}/${result.diastolic} mmHg`);
-            
+
             if (result.heartRate) {
               next.heartRate = String(result.heartRate);
               fillMsg.push(`ชีพจร ${result.heartRate} bpm`);
@@ -291,7 +295,7 @@ export default function PatientHealthPage() {
 
   function parseVitalsFromFilename(filename: string) {
     const clean = filename.toLowerCase();
-    
+
     if (clean.includes("bp") || clean.includes("pressure") || clean.includes("dia") || clean.includes("sys")) {
       const matches = clean.match(/(\d{2,3})\D+(\d{2,3})(?:\D+(\d{2,3}))?/);
       if (matches) {
@@ -306,7 +310,7 @@ export default function PatientHealthPage() {
         };
       }
     }
-    
+
     if (clean.includes("sugar") || clean.includes("glucose") || clean.includes("glu")) {
       const matches = clean.match(/(\d{2,3})/);
       if (matches) {
@@ -321,7 +325,7 @@ export default function PatientHealthPage() {
         };
       }
     }
-    
+
     if (clean.includes("weight") || clean.includes("scale") || clean.includes("kg")) {
       const matches = clean.match(/(\d{2,3})/);
       if (matches) {
@@ -336,7 +340,7 @@ export default function PatientHealthPage() {
         };
       }
     }
-    
+
     return null;
   }
 
@@ -419,7 +423,7 @@ export default function PatientHealthPage() {
             next.systolic = String(result.systolic);
             next.diastolic = String(result.diastolic);
             fillMsg.push(`ความดันโลหิต ${result.systolic}/${result.diastolic} mmHg`);
-            
+
             if (result.heartRate) {
               next.heartRate = String(result.heartRate);
               fillMsg.push(`ชีพจร ${result.heartRate} bpm`);
@@ -449,8 +453,12 @@ export default function PatientHealthPage() {
   }
 
   function submitRecord() {
-    setDb((current) =>
-      addHealthRecord(current, {
+    if (Object.values(form).some(value => !value.trim() || !Number.isFinite(Number(value)) || Number(value) < 0) || Number(form.height) === 0) {
+      toast.error("กรุณาตรวจสอบตัวเลขก่อนบันทึก");
+      return;
+    }
+    setDb(
+      addHealthRecord(db, {
         patientId: patient.id,
         date: new Date().toISOString(),
         systolic: Number(form.systolic),
@@ -480,7 +488,7 @@ export default function PatientHealthPage() {
       const imageUrl = URL.createObjectURL(file);
       setFoodImage(imageUrl);
       setScannerReady(true);
-      
+
       try {
         setScannerLoading(true);
         const base64Data = await compressAndResizeImage(file);
@@ -524,13 +532,13 @@ export default function PatientHealthPage() {
       ].join("\n");
 
       const answer = await askAI(prompt, filesArray);
-      
+
       let cleanJson = answer.trim();
       const jsonMatch = cleanJson.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         cleanJson = jsonMatch[0];
       }
-      
+
       const data = JSON.parse(cleanJson) as FoodAnalysis;
       setFoodAnalysis(data);
     } catch (error) {
@@ -544,7 +552,7 @@ export default function PatientHealthPage() {
         sugar: "ไม่ระบุ",
         sodium: "ไม่ระบุ",
         score: "ไม่ระบุ",
-        recommendation: error instanceof Error ? `วิเคราะห์ข้อมูลไม่สำเร็จ: ${error.message}` : "วิเคราะห์อาหารขัดข้อง"
+        recommendation: "ยังวิเคราะห์มื้อนี้ไม่ได้ ลองรูปที่ชัดขึ้นหรือพิมพ์ชื่อเมนูอีกครั้ง"
       });
     } finally {
       setScannerLoading(false);
@@ -553,236 +561,34 @@ export default function PatientHealthPage() {
 
   return (
     <MobileShell role="patient" title="สุขภาพ">
-      <Tabs defaultValue="records" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="records">บันทึก</TabsTrigger>
-          <TabsTrigger value="charts">กราฟ</TabsTrigger>
-          <TabsTrigger value="food">อาหาร</TabsTrigger>
-          <TabsTrigger value="ai">AI</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="records" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Plus className="h-5 w-5 text-sky-600" />
-                เพิ่มข้อมูลสุขภาพ
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {/* Scan Vitals Section */}
-              {/* Scan Vitals Section */}
-              <div className="flex flex-col gap-3">
-                <div className="flex gap-3">
-                  {/* Camera Capture Button */}
-                  <button
-                    type="button"
-                    onClick={() => setIsVitalsCameraOpen(true)}
-                    className="flex flex-1 min-h-[110px] cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-sky-200 bg-sky-50 text-center p-3 transition-all hover:bg-sky-100/50"
-                  >
-                    <Camera className="h-7 w-7 text-sky-600" />
-                    <span className="mt-2 text-xs font-bold text-slate-700">ถ่ายรูปเครื่องวัด</span>
-                    <p className="text-[9px] text-slate-500 mt-0.5">เปิดกล้องถ่ายภาพทันที</p>
-                  </button>
-                  
-                  {/* File Upload Button */}
-                  <label className="flex flex-1 min-h-[110px] cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/50 text-center p-3 transition-all hover:bg-slate-100">
-                    <Upload className="h-7 w-7 text-slate-500" />
-                    <span className="mt-2 text-xs font-bold text-slate-700">อัปโหลดรูปภาพ</span>
-                    <p className="text-[9px] text-slate-500 mt-0.5">เลือกจากคลังรูปภาพ</p>
-                    <input
-                      type="file"
-                      className="sr-only"
-                      accept="image/*"
-                      onChange={handleDeviceScan}
-                    />
-                  </label>
-                </div>
-
-                {deviceScanning ? (
-                  <div className="flex items-center gap-2 text-xs font-semibold text-sky-700 bg-sky-50 p-3 rounded-xl border border-sky-100">
-                    <Loader2 className="h-4 w-4 animate-spin shrink-0" />
-                    <span>AI กำลังวิเคราะห์สัญญาณชีพจากภาพเครื่องวัดของคุณ...</span>
-                  </div>
-                ) : null}
-
-                {deviceImagePreview ? (
-                  <div className="flex items-center gap-3 bg-white p-2.5 rounded-xl border">
-                    <div className="relative h-12 w-12 overflow-hidden rounded-lg bg-slate-100 border shrink-0">
-                      <img src={deviceImagePreview} alt="Device preview" className="h-full w-full object-cover" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[11px] font-bold text-slate-700">ภาพเครื่องวัดที่ประมวลผล</p>
-                      <p className="text-[10px] text-slate-500 truncate">{deviceNameLog}</p>
-                    </div>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      type="button"
-                      className="h-7 text-[11px] font-bold text-rose-600 hover:bg-rose-50 px-2 rounded-lg"
-                      onClick={() => {
-                        setDeviceImagePreview("");
-                        setDeviceNameLog("");
-                      }}
-                    >
-                      ลบภาพ
-                    </Button>
-                  </div>
-                ) : null}
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                {[
-                  ["systolic", "ความดันตัวบน (SYS) - mmHg", "ตัวบน"],
-                  ["diastolic", "ความดันตัวล่าง (DIA) - mmHg", "ตัวล่าง"],
-                  ["bloodSugar", "ระดับน้ำตาล - mg/dL", "น้ำตาล"],
-                  ["weight", "น้ำหนักตัว - kg", "น้ำหนัก"],
-                  ["height", "ส่วนสูง - cm", "ส่วนสูง"],
-                  ["sleepHours", "ชั่วโมงนอน - ชม.", "ชั่วโมงนอน"],
-                  ["heartRate", "ชีพจร - ครั้ง/นาที (bpm)", "ชีพจร"]
-                ].map(([key, label, shortPlaceholder]) => (
-                  <div key={key} className="space-y-1">
-                    <label className="text-[11px] font-bold text-slate-500 pl-1">{label}</label>
-                    <Input
-                      value={form[key as keyof typeof form]}
-                      onChange={(event) => setForm((current) => ({ ...current, [key]: event.target.value }))}
-                      placeholder={shortPlaceholder}
-                      inputMode="decimal"
-                    />
-                  </div>
-                ))}
-              </div>
-              <Button className="w-full" onClick={submitRecord}>
-                <CheckCircle2 className="h-5 w-5" />
-                บันทึกและส่งให้ผู้ดูแลยืนยัน
-              </Button>
-            </CardContent>
-          </Card>
-
-          <ul className="space-y-3">
-            {records.slice(-7).reverse().map((record) => (
-              <li key={record.id}>
-                <article className="flex items-center gap-3 rounded-2xl border bg-white p-4 shadow-card">
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-sky-50 text-sky-700">
-                    <HeartPulse className="h-5 w-5" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="font-bold text-slate-900">{record.systolic}/{record.diastolic} · น้ำตาล {record.bloodSugar}</p>
-                    <p className="text-xs text-slate-500 mt-0.5">{formatThaiDate(record.date)} · {record.source === "patient" ? "ผู้ป่วยบันทึก" : "อุปกรณ์/ผู้ดูแล"}</p>
-                  </div>
-                  <Badge tone={record.confirmationStatus === "confirmed" ? "green" : record.confirmationStatus === "rejected" ? "red" : "yellow"}>
-                    {record.confirmationStatus === "confirmed" ? "ยืนยันแล้ว" : record.confirmationStatus === "rejected" ? "ปฏิเสธ" : "รอยืนยัน"}
-                  </Badge>
-                  <Button size="icon" variant="ghost" onClick={() => setDb((current) => deleteHealthRecord(current, record.id))}>
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </article>
-              </li>
-            ))}
-          </ul>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-4"><TabsTrigger value="records">บันทึก</TabsTrigger><TabsTrigger value="charts">แนวโน้ม</TabsTrigger><TabsTrigger value="food">มื้ออาหาร</TabsTrigger><TabsTrigger value="ai">ผู้ช่วย</TabsTrigger></TabsList>
+        <TabsContent value="records" className="space-y-6">
+          <section className="care-sheet p-5">
+            <header className="mb-5"><h2 className="mobile-section-title">วันนี้ร่างกายเป็นยังไง?</h2><p className="mt-1 text-xs text-slate-500">กรอกเอง หรือให้รูปช่วยอ่านค่า</p></header>
+            <div className="mb-5 grid grid-cols-2 gap-2">
+              <button type="button" onClick={()=>setIsVitalsCameraOpen(true)} className="flex min-h-[70px] items-center justify-center gap-2 rounded-[20px] bg-[#e4f2fd] text-sm font-medium text-sky-800"><Camera className="h-5 w-5"/>ถ่ายรูปเครื่องวัด</button>
+              <label className="flex min-h-[70px] cursor-pointer items-center justify-center gap-2 rounded-[20px] bg-[#efebfa] text-sm font-medium text-violet-700"><Upload className="h-5 w-5"/>เลือกรูป<input type="file" className="sr-only" aria-label="เลือกรูปเครื่องวัด" accept="image/*" onChange={handleDeviceScan}/></label>
+            </div>
+            {deviceScanning&&<p role="status" className="mb-4 flex items-center gap-2 text-sm text-sky-700"><Loader2 className="h-4 w-4 animate-spin"/>กำลังอ่านค่าจากรูป…</p>}
+            {deviceImagePreview&&<div className="mb-4 flex items-center gap-3"><img src={deviceImagePreview} alt="รูปเครื่องวัดที่เลือก" className="h-12 w-12 rounded-xl object-cover"/><p className="flex-1 text-xs text-slate-500">ตรวจสอบตัวเลขก่อนบันทึก</p><Button size="sm" variant="ghost" onClick={()=>{setDeviceImagePreview("");setDeviceNameLog("");}}>ลบรูป</Button></div>}
+            <div className="grid grid-cols-2 gap-3">
+              {[["systolic","ความดันตัวบน","mmHg"],["diastolic","ความดันตัวล่าง","mmHg"],["bloodSugar","น้ำตาล","mg/dL"],["weight","น้ำหนัก","กก."]].map(([key,label,unit])=><div key={key}><label htmlFor={`vital-${key}`} className="mobile-form-label">{label}<span className="ml-1 text-[10px] text-slate-400">{unit}</span></label><Input id={`vital-${key}`} type="number" min="0" step="any" value={form[key as keyof typeof form]} onChange={e=>setForm(current=>({...current,[key]:e.target.value}))} inputMode="decimal"/></div>)}
+            </div>
+            <details className="mt-4"><summary className="flex min-h-11 items-center justify-between text-sm text-slate-500">การนอน ชีพจร และส่วนสูง<span className="text-sky-600">+</span></summary><div className="grid grid-cols-2 gap-3 pt-2">{[["sleepHours","เวลานอน (ชม.)"],["heartRate","ชีพจร (ครั้ง/นาที)"],["height","ส่วนสูง (ซม.)"]].map(([key,label])=><div key={key}><label className="mobile-form-label" htmlFor={`vital-${key}`}>{label}</label><Input id={`vital-${key}`} type="number" min="0" step="any" value={form[key as keyof typeof form]} onChange={e=>setForm(current=>({...current,[key]:e.target.value}))} inputMode="decimal"/></div>)}</div></details>
+            <Button className="mt-5 h-12 w-full rounded-full" onClick={submitRecord}><CheckCircle2 className="h-4 w-4"/>บันทึกสุขภาพ</Button><p className="mt-2 text-center text-[11px] text-slate-500">ส่งให้ผู้ดูแลช่วยยืนยัน</p>
+          </section>
+          <section><h3 className="mobile-section-title mb-2">บันทึกล่าสุด</h3><ul className="divide-y divide-slate-200/60">{records.slice(-7).reverse().map(record=><li key={record.id} className="py-4"><div className="flex items-start justify-between gap-2"><div className="min-w-0"><p className="text-sm font-semibold">ความดัน {record.systolic}/{record.diastolic}</p><p className="mt-0.5 text-xs text-slate-500">น้ำตาล {record.bloodSugar} mg/dL · {formatThaiDate(record.date)}</p><p className={`mt-2 text-xs ${record.confirmationStatus==="confirmed"?"text-emerald-700":record.confirmationStatus==="rejected"?"text-rose-600":"text-amber-700"}`}>{record.confirmationStatus==="confirmed"?"ผู้ดูแลยืนยันแล้ว":record.confirmationStatus==="rejected"?"ให้ตรวจสอบอีกครั้ง":"รอผู้ดูแลยืนยัน"}</p></div><Button size="icon" variant="ghost" aria-label={`ลบบันทึก ${formatThaiDate(record.date)}`} onClick={()=>setDb(deleteHealthRecord(db,record.id))}><Trash2 className="h-4 w-4 text-slate-400"/></Button></div></li>)}</ul>{!records.length&&<p className="py-6 text-sm text-slate-500">ยังไม่มีบันทึกสุขภาพ</p>}</section>
         </TabsContent>
-
-        <TabsContent value="charts" className="space-y-4">
-          <MultiMetricChart records={records} />
+        <TabsContent value="charts"><MobileHealthChart records={records}/></TabsContent>
+        <TabsContent value="food" className="space-y-5">
+          <section className="relative overflow-hidden rounded-[30px_30px_40px_24px] bg-[#e6f3eb] p-5"><h2 className="relative z-10 text-2xl font-bold leading-9 text-emerald-900">มื้อนี้<br/>กินอะไรดี?</h2><p className="relative z-10 mt-2 text-xs text-emerald-700">ให้ผู้ช่วยดูสารอาหารให้</p><HealthCharm mood="meal" className="mobile-float absolute -right-2 bottom-0 h-32 w-32"/></section>
+          <section className="care-sheet p-5"><div className="grid grid-cols-2 gap-2"><button type="button" onClick={()=>setIsFoodCameraOpen(true)} className="flex min-h-[70px] items-center justify-center gap-2 rounded-[20px] bg-sky-50 text-sm font-medium text-sky-800"><Camera className="h-5 w-5"/>ถ่ายรูปอาหาร</button><label className="flex min-h-[70px] cursor-pointer items-center justify-center gap-2 rounded-[20px] bg-[#fff0da] text-sm font-medium text-amber-800"><Upload className="h-5 w-5"/>เลือกรูป<input type="file" className="sr-only" aria-label="เลือกรูปอาหาร" accept="image/*" onChange={handleFileChange}/></label></div>
+          {foodImage&&<img src={foodImage} alt="อาหารที่เลือก" className="mt-4 max-h-48 w-full rounded-2xl object-contain"/>}
+          <form className="mt-4 space-y-3" onSubmit={e=>{e.preventDefault();if(foodNameInput.trim()){setScannerReady(true);runFoodAnalysis(foodNameInput,foodFilesPayload);}}}><label htmlFor="food-name" className="mobile-form-label">หรือพิมพ์ชื่อเมนู</label><Input id="food-name" placeholder="เช่น ข้าวกะเพราไข่ดาว" value={foodNameInput} onChange={e=>setFoodNameInput(e.target.value)} disabled={scannerLoading}/><Button className="h-12 w-full rounded-full" disabled={scannerLoading||!foodNameInput.trim()}>{scannerLoading?<Loader2 className="h-4 w-4 animate-spin"/>:<Utensils className="h-4 w-4"/>}{scannerLoading?"กำลังดูสารอาหาร…":"ดูสารอาหาร"}</Button></form></section>
+          {scannerReady&&foodAnalysis&&!scannerLoading&&<section className="care-sheet p-5"><h3 className="mobile-section-title">{foodAnalysis.name}</h3><p className="mt-2 text-[30px] font-bold text-sky-700">{foodAnalysis.calories}</p><dl className="mt-5 grid grid-cols-2 gap-x-4 gap-y-3 border-t border-slate-100 pt-4">{[["โปรตีน",foodAnalysis.protein],["คาร์โบไฮเดรต",foodAnalysis.carbs],["ไขมัน",foodAnalysis.fat],["น้ำตาล",foodAnalysis.sugar],["โซเดียม",foodAnalysis.sodium],["คะแนนโภชนาการ",foodAnalysis.score]].map(([label,value])=><div key={label}><dt className="text-xs text-slate-500">{label}</dt><dd className="mt-1 text-sm font-semibold">{value}</dd></div>)}</dl><div className="mt-5 border-t border-slate-100 pt-4 text-sm leading-7 text-slate-600"><MarkdownRenderer content={foodAnalysis.recommendation}/></div></section>}
         </TabsContent>
-
-        <TabsContent value="food" className="space-y-4">
-          <Card>
-            <CardHeader><CardTitle className="flex items-center gap-2"><Utensils className="h-5 w-5 text-sky-600" /> Food Scanner</CardTitle></CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex flex-col gap-3">
-                <div className="flex gap-3">
-                  {/* Camera Capture Button */}
-                  <button
-                    type="button"
-                    onClick={() => setIsFoodCameraOpen(true)}
-                    className="flex flex-1 min-h-[110px] cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-sky-200 bg-sky-50 text-center p-3 transition-all hover:bg-sky-100/50"
-                  >
-                    <Camera className="h-7 w-7 text-sky-600" />
-                    <span className="mt-2 text-xs font-bold text-slate-700">ถ่ายรูปอาหาร</span>
-                    <p className="text-[9px] text-slate-500 mt-0.5">เปิดกล้องถ่ายภาพทันที</p>
-                  </button>
-                  
-                  {/* File Upload Button */}
-                  <label className="flex flex-1 min-h-[110px] cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/50 text-center p-3 transition-all hover:bg-slate-100">
-                    <Upload className="h-7 w-7 text-slate-500" />
-                    <span className="mt-2 text-xs font-bold text-slate-700">อัปโหลดรูปภาพ</span>
-                    <p className="text-[9px] text-slate-500 mt-0.5">เลือกจากคลังรูปภาพ</p>
-                    <input
-                      type="file"
-                      className="sr-only"
-                      accept="image/*"
-                      onChange={handleFileChange}
-                    />
-                  </label>
-                </div>
-
-                {foodImage ? (
-                  <div className="relative w-full min-h-40 overflow-hidden rounded-2xl border bg-slate-100 flex items-center justify-center p-2">
-                    <img src={foodImage} alt="Food preview" className="max-h-40 object-contain rounded-xl" />
-                  </div>
-                ) : null}
-              </div>
-
-              {scannerReady ? (
-                <div className="space-y-3">
-                  <div className="flex gap-2">
-                    <Input
-                      value={foodNameInput}
-                      onChange={(e) => setFoodNameInput(e.target.value)}
-                      placeholder="ระบุชื่ออาหารหากชื่อไฟล์ไม่ตรงกับรูปภาพ (เช่น ข้าวผัดกะเพรา)..."
-                      className="flex-1"
-                      disabled={scannerLoading}
-                    />
-                    <Button onClick={() => runFoodAnalysis(foodNameInput, foodFilesPayload)} disabled={scannerLoading}>
-                      วิเคราะห์ใหม่
-                    </Button>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    {scannerLoading ? (
-                      <div className="col-span-2 flex min-h-[200px] flex-col items-center justify-center gap-2 rounded-2xl bg-white p-8 text-sky-600 shadow-card">
-                        <Loader2 className="h-6 w-6 animate-spin text-sky-600" />
-                        <p className="font-semibold text-slate-700">AI กำลังวิเคราะห์รูปภาพอาหาร...</p>
-                      </div>
-                    ) : foodAnalysis ? (
-                      <>
-                        {[
-                          ["ชื่ออาหาร", foodAnalysis.name],
-                          ["Calories", foodAnalysis.calories],
-                          ["Protein", foodAnalysis.protein],
-                          ["Carbohydrate", foodAnalysis.carbs],
-                          ["Fat", foodAnalysis.fat],
-                          ["Sugar", foodAnalysis.sugar],
-                          ["Sodium", foodAnalysis.sodium],
-                          ["Nutrition Score", foodAnalysis.score]
-                        ].map(([label, value]) => (
-                          <div key={label} className="rounded-2xl bg-white p-3 shadow-card">
-                            <p className="text-xs text-slate-500">{label}</p>
-                            <p className="font-bold text-slate-900">{value}</p>
-                          </div>
-                        ))}
-                        <div className="col-span-2 rounded-2xl bg-emerald-50 p-4 text-sm leading-6 text-emerald-800">
-                          <p className="font-bold mb-2">คำแนะนำโภชนาการสำหรับคุณ:</p>
-                          <MarkdownRenderer content={foodAnalysis.recommendation} />
-                        </div>
-                      </>
-                    ) : null}
-                  </div>
-                </div>
-              ) : null}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="ai">
-          <MockChat
-            title="ผู้ช่วย AI ของผู้ป่วย"
-            seedMessages={db.chatHistory.patient}
-            mode="patient"
-            context={`ผู้ป่วย ${patient.name}; diagnosis ${patient.diagnosis.join(", ")}; medication ${patient.medications.join(", ")}; BP ล่าสุด ${latest.systolic}/${latest.diastolic}; blood sugar ล่าสุด ${latest.bloodSugar}; exercise ${latest.exerciseMinutes} นาที; sleep ${latest.sleepHours} ชั่วโมง`}
-          />
-        </TabsContent>
+        <TabsContent value="ai"><MockChat title="เพื่อนสุขภาพ" seedMessages={db.chatHistory.patient} mode="patient" context={`ผู้ป่วย ${patient.name}; diagnosis ${patient.diagnosis.join(", ")}; medication ${patient.medications.join(", ")}; BP ล่าสุด ${latest.systolic}/${latest.diastolic}; blood sugar ล่าสุด ${latest.bloodSugar}; exercise ${latest.exerciseMinutes} นาที; sleep ${latest.sleepHours} ชั่วโมง`}/></TabsContent>
       </Tabs>
 
       {/* Vitals Scanner Camera Modal */}
@@ -826,7 +632,7 @@ function CameraModal({ isOpen, onClose, onCapture }: CameraModalProps) {
     setError(null);
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { 
+        video: {
           facingMode: "environment",
           width: { ideal: 1280 },
           height: { ideal: 720 }
@@ -839,7 +645,7 @@ function CameraModal({ isOpen, onClose, onCapture }: CameraModalProps) {
       }
     } catch (err) {
       console.error("Camera access failed:", err);
-      setError("ไม่สามารถเข้าถึงกล้องได้ (กรุณาเชื่อมต่อผ่าน HTTPS หรือตรวจสอบสิทธิ์กล้องบนเบราว์เซอร์ของคุณ)");
+      setError("ไม่สามารถเข้าถึงกล้องได้ (ตรวจสอบสิทธิ์กล้องแล้วลองอีกครั้ง)");
     }
   }
 
@@ -854,10 +660,10 @@ function CameraModal({ isOpen, onClose, onCapture }: CameraModalProps) {
     if (videoRef.current) {
       const video = videoRef.current;
       const canvas = document.createElement("canvas");
-      
+
       canvas.width = video.videoWidth || 1280;
       canvas.height = video.videoHeight || 720;
-      
+
       const ctx = canvas.getContext("2d");
       if (ctx) {
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
@@ -874,15 +680,16 @@ function CameraModal({ isOpen, onClose, onCapture }: CameraModalProps) {
     <div className="fixed inset-0 z-[999] flex flex-col items-center justify-center bg-slate-950 p-0 sm:p-4">
       {/* Full screen mobile shell or centered card on desktop */}
       <div className="relative flex h-full w-full max-w-md flex-col justify-between bg-black text-white shadow-2xl sm:h-[85vh] sm:rounded-3xl sm:border sm:border-slate-800 overflow-hidden">
-        
+
         {/* Top Header - Glassmorphism floating panel */}
         <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between bg-gradient-to-b from-black/80 to-transparent p-4 backdrop-blur-[2px]">
           <div className="flex items-center gap-2">
             <div className="h-2.5 w-2.5 rounded-full bg-sky-500 animate-pulse" />
-            <h3 className="text-xs font-bold uppercase tracking-wider text-sky-400">Live AI Scanner</h3>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-sky-400">ถ่ายรูปให้ชัดในกรอบ</h3>
           </div>
-          <button 
-            className="rounded-full bg-black/40 p-2 text-slate-300 hover:text-white backdrop-blur-md transition-all hover:bg-black/60 active:scale-95" 
+          <button
+            aria-label="ปิดกล้อง"
+            className="rounded-full bg-black/40 p-3 text-slate-300 hover:text-white backdrop-blur-md transition-all hover:bg-black/60 active:scale-95"
             onClick={onClose}
             type="button"
           >
@@ -901,12 +708,12 @@ function CameraModal({ isOpen, onClose, onCapture }: CameraModalProps) {
               </Button>
             </div>
           ) : (
-            <video 
-              ref={videoRef} 
-              autoPlay 
-              playsInline 
-              muted 
-              className="absolute inset-0 h-full w-full object-cover" 
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className="absolute inset-0 h-full w-full object-cover"
             />
           )}
 

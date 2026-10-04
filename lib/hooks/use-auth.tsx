@@ -242,7 +242,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (typeof window !== "undefined") {
           sessionStorage.removeItem("appt_popup_shown");
         }
-        router.push("/login");
+        // A fresh page clears the authenticated route and avoids overlapping guard redirects.
+        window.location.assign("/login/");
       }
     }),
     [loading, router, user, setDb]

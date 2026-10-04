@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { motion } from "framer-motion";
-import { Bell, HeartPulse, Home, ListChecks, UserRound, UsersRound } from "lucide-react";
+import { motion, useReducedMotion } from "framer-motion";
+import { ArrowLeft, Bell, HeartPulse, Home, ListChecks, UserRound, UsersRound } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Protected } from "@/components/auth/protected";
 import { UserRole } from "@/lib/types";
@@ -35,6 +35,7 @@ export function MobileShell({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const reduceMotion = useReducedMotion();
   const navItems = navConfig[role];
   const { db } = useMockStore();
   const { user } = useAuth();
@@ -66,73 +67,32 @@ export function MobileShell({
     hasIndicator = unreadNotifications || pendingRecords || pendingTasks;
   }
 
+  const isHome = pathname === `/${role}` || pathname === `/${role}/`;
+  const isSubPage = ["/notifications", "/alerts", "/ai", "/burnout"].some(part => pathname.includes(part));
   return (
     <Protected role={role}>
-      <div className="mx-auto min-h-screen w-full max-w-3xl bg-gradient-to-b from-white/80 to-sky-50/80">
-        <header className="sticky top-0 z-30 flex items-center justify-between border-b border-sky-100 bg-white/88 px-5 py-3.5 backdrop-blur-xl">
-          <div>
-            {title === "WELLYNC" ? (
-              <h1 className="text-[20px] font-black text-sky-600 tracking-wider uppercase">WELLYNC</h1>
-            ) : (
-              <>
-                <p className="text-[10px] font-black text-sky-600 uppercase tracking-widest">Wellync</p>
-                <h1 className="text-[17px] font-extrabold text-slate-950 mt-0.5">{title}</h1>
-              </>
-            )}
+      <div className="mobile-app mx-auto min-h-dvh w-full max-w-[440px]">
+        <header className="mobile-header sticky top-0 z-30 flex min-h-[72px] items-center justify-between gap-3 px-5">
+          <div className="flex min-w-0 items-center gap-2">
+            {isSubPage && <Link href={`/${role}`} aria-label="กลับหน้าหลัก" className="mobile-icon-button -ml-2"><ArrowLeft className="h-5 w-5" /></Link>}
+            {isHome ? <h1 className="flex items-center gap-2 text-xl font-bold tracking-tight text-sky-700"><HeartPulse className="h-6 w-6" />wellync<span className="text-sky-400">.</span></h1> : <h1 className="text-xl font-bold text-slate-900">{title}</h1>}
           </div>
-          
-          {/* Top-Right Notification/Alert Button (Bell icon for both Patient and Caregiver) */}
-          {role === "patient" ? (
-            <Link
-              href="/patient/notifications"
-              className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-sky-700 hover:bg-sky-200 transition-colors"
-              aria-label="การแจ้งเตือน"
-            >
-              <Bell className="h-4.5 w-4.5" />
-              {hasIndicator && (
-                <span className="absolute top-[8px] right-[8px] h-[10px] w-[10px] rounded-full bg-red-500" />
-              )}
-            </Link>
-          ) : (
-            <Link
-              href="/caregiver/alerts"
-              className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-sky-700 hover:bg-sky-200 transition-colors"
-              aria-label="การแจ้งเตือนและการดูแลความเสี่ยง"
-            >
-              <Bell className="h-4.5 w-4.5" />
-              {hasIndicator && (
-                <span className="absolute top-[8px] right-[8px] h-[10px] w-[10px] rounded-full bg-red-500" />
-              )}
-            </Link>
-          )}
+          <Link href={role === "patient" ? "/patient/notifications" : "/caregiver/alerts"} className="mobile-icon-button relative bg-white" aria-label={hasIndicator ? "การแจ้งเตือน มีรายการใหม่" : "การแจ้งเตือน"}>
+            <Bell className="h-5 w-5" />
+            {hasIndicator && <span className="absolute right-2.5 top-2.5 h-2 w-2 rounded-full bg-rose-400 ring-2 ring-white" />}
+          </Link>
         </header>
-
-        <motion.main
-          initial={{ opacity: 0, y: 3 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.08 }}
-          className="space-y-4 px-5 py-4 pb-24"
-        >
+        <motion.main key={pathname} initial={reduceMotion ? false : { opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }} className="mobile-main space-y-6 px-5 pb-28 pt-3">
           {children}
         </motion.main>
-
-        <nav className="fixed bottom-0 left-1/2 z-40 grid w-full max-w-3xl -translate-x-1/2 grid-cols-4 gap-1 border-t border-sky-100 bg-white/94 px-4 pb-2.5 pt-1.5 backdrop-blur-xl">
-          {navItems.map((item) => {
-            const active = pathname === item.href;
+        <nav aria-label="เมนูหลัก" className="mobile-nav fixed bottom-0 left-1/2 z-40 grid w-full max-w-[440px] -translate-x-1/2 grid-cols-4 gap-1 px-3 pt-2">
+          {navItems.map(item => {
+            const active = pathname.replace(/\/$/, "") === item.href;
             const Icon = item.icon;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  "flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-xl text-[10px] font-semibold text-slate-500 transition",
-                  active && "bg-sky-50 text-sky-700"
-                )}
-              >
-                <Icon className="h-4.5 w-4.5" />
-                <span>{item.label}</span>
-              </Link>
-            );
+            return <Link key={item.href} href={item.href} aria-current={active ? "page" : undefined} className={cn("relative flex min-h-[62px] flex-col items-center justify-center gap-1 rounded-[24px] text-xs font-medium transition-colors", active ? "text-sky-700" : "text-slate-500")}>
+              {active && <motion.span layoutId={reduceMotion ? undefined : "mobile-navigation"} className="absolute inset-x-2 top-0 h-10 rounded-[45%_45%_40%_40%] bg-sky-100/70" transition={{ type: "spring", stiffness: 380, damping: 30 }} />}
+              <Icon className="relative h-[22px] w-[22px]" strokeWidth={active ? 2.3 : 1.7} /><span className="relative">{item.label}</span>
+            </Link>;
           })}
         </nav>
       </div>

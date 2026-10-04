@@ -1,7 +1,9 @@
 "use client";
 
-import { BellRing, Bluetooth, Building2, Clock, LogOut, UserRound, FileText } from "lucide-react";
+import Link from "next/link";
+import { BellRing, Bluetooth, Building2, ShieldCheck, LogOut, HeartHandshake, ArrowUpRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { HealthPassport } from "@/components/health/health-passport";
 import { MobileShell } from "@/components/layouts/mobile-shell";
 import { useAuth } from "@/lib/hooks/use-auth";
 import { useMockStore } from "@/lib/hooks/use-mock-store";
@@ -9,97 +11,31 @@ import { useMockStore } from "@/lib/hooks/use-mock-store";
 export default function PatientProfilePage() {
   const { logout, user } = useAuth();
   const { db } = useMockStore();
-  const patient = db.patients.find((item) => item.email === user?.email) || db.patients[0];
-  const caregiver = db.caregivers.find((item) => item.patientId === patient.id);
-  const consents = db.consents.filter((item) => item.patientId === patient.id);
+  const patient = db.patients.find(item => item.email === user?.email) || db.patients[0];
+  const caregiver = db.caregivers.find(item => item.patientId === patient.id);
+  const consents = db.consents.filter(item => item.patientId === patient.id);
+  const connections = [
+    { icon: Building2, title: "โรงพยาบาลที่เชื่อมต่อ", text: patient.hospital },
+    { icon: Bluetooth, title: "อุปกรณ์สุขภาพ", text: "เครื่องวัดความดัน · เครื่องชั่งน้ำหนัก · Smart Watch" },
+    { icon: BellRing, title: "การแจ้งเตือนของคุณ", text: "ยา นัดหมาย และสุขภาพ", href: "/patient/notifications" },
+    { icon: ShieldCheck, title: "สิทธิ์การเข้าถึงข้อมูล", text: `${consents.length} รายการ`, href: "/patient/notifications" }
+  ];
 
-  return (
-    <MobileShell role="patient" title="โปรไฟล์">
-      {/* Name Profile Card */}
-      <article className="flex items-center gap-4 rounded-3xl border bg-white p-5 shadow-card">
-        <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-3xl bg-sky-100 text-sky-700">
-          <UserRound className="h-8 w-8" />
-        </div>
-        <div>
-          <h2 className="text-xl font-bold">{patient.name}</h2>
-          <p className="text-sm text-slate-500">Patient ID {patient.id} · อายุ {patient.age} ปี</p>
-        </div>
-      </article>
-
-      {/* Basic Health Details (EMR) Card - Directly under name card */}
-      <section className="rounded-3xl border bg-white p-5 shadow-card space-y-3 text-xs">
-        <header className="pb-1 border-b border-slate-100">
-          <h3 className="text-sm font-black flex items-center gap-1.5 text-slate-800">
-            <FileText className="h-4.5 w-4.5 text-sky-600" />
-            ข้อมูลสุขภาพเบื้องต้น (เวชระเบียน)
-          </h3>
-        </header>
-        <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
-          <div>
-            <p className="font-bold text-slate-400">น้ำหนัก / ส่วนสูง</p>
-            <p className="font-bold text-slate-700 mt-0.5">{patient.weight ? `${patient.weight} กก. / ${patient.height} ซม.` : "ไม่ระบุ"}</p>
-          </div>
-          <div>
-            <p className="font-bold text-slate-400">ประกันสุขภาพ / สิทธิ์การรักษา</p>
-            <p className="font-bold text-sky-700 mt-0.5">หลักประกันสุขภาพถ้วนหน้า (บัตรทอง)</p>
-          </div>
-          <div>
-            <p className="font-bold text-slate-400">ยาที่แพ้ (Drug Allergies)</p>
-            <p className="font-bold text-rose-600 mt-0.5">{patient.allergies.join(", ") || "ไม่มีประวัติแพ้ยา"}</p>
-          </div>
-          <div>
-            <p className="font-bold text-slate-400">อาหารที่แพ้</p>
-            <p className="font-bold text-slate-700 mt-0.5">ไม่มีประวัติแพ้อาหาร</p>
-          </div>
-          <div className="col-span-2 border-t border-slate-100 pt-2">
-            <p className="font-bold text-slate-400">โรคประจำตัว (Diagnosis)</p>
-            <p className="font-bold text-slate-700 mt-0.5">{patient.diagnosis.join(" · ")}</p>
-          </div>
-          <div className="col-span-2">
-            <p className="font-bold text-slate-400">ยาที่กินประจํา (Medications)</p>
-            <p className="font-bold text-slate-700 mt-0.5">{patient.medications.join(", ")}</p>
-          </div>
-        </div>
-      </section>
-
-      {/* Hospital details & PDPA status */}
-      <ul className="space-y-3">
-        {[
-          [Building2, "Hospital Connections", `${patient.hospital}`],
-          [Bluetooth, "Connected Devices", "เครื่องวัดความดัน · เครื่องชั่งน้ำหนัก · Smart Watch"],
-          [BellRing, "Notification Settings", "ยา นัดหมาย Early Warning และ AI Recommendation"],
-          [Clock, "Consent History", `${consents.length} รายการ · ผู้ป่วยเป็นเจ้าของข้อมูลตาม PDPA`]
-        ].map(([Icon, title, text]) => (
-          <li key={String(title)}>
-            <article className="flex gap-3 rounded-2xl border bg-white p-4 shadow-card">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-sky-50 text-sky-700">
-                <Icon className="h-5 w-5" />
-              </div>
-              <div>
-                <p className="font-bold text-slate-800">{title as string}</p>
-                <p className="mt-1 text-sm leading-6 text-slate-500">{text as string}</p>
-              </div>
-            </article>
-          </li>
-        ))}
+  return <MobileShell role="patient" title="โปรไฟล์">
+    <HealthPassport patient={patient} />
+    <section className="px-1 py-3">
+      <header className="mb-2"><h3 className="text-base font-bold text-slate-900">การเชื่อมต่อ</h3></header>
+      <ul className="divide-y divide-slate-200/60">
+        {connections.map(({ icon: Icon, title, text, href }) => {
+          const content = <><Icon className="mt-1 h-5 w-5 shrink-0 text-sky-600" /><div className="min-w-0 flex-1"><h4 className="text-sm font-semibold text-slate-800">{title}</h4><p className="mt-1 text-sm leading-6 text-slate-500">{text}</p></div>{href && <ArrowUpRight className="mt-1 h-4 w-4 shrink-0 text-slate-400" />}</>;
+          return <li key={title}>{href ? <Link href={href} className="flex min-h-14 gap-3 rounded-lg py-4 transition-colors hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500">{content}</Link> : <div className="flex gap-3 py-4">{content}</div>}</li>;
+        })}
       </ul>
-
-      {/* Caregiver connection */}
-      <section className="rounded-3xl border bg-white p-5 shadow-card">
-        <header className="mb-2">
-          <h3 className="font-bold text-slate-900">ผู้ดูแลที่เชื่อมต่อ</h3>
-        </header>
-        <p className="font-bold text-slate-800">{caregiver?.name}</p>
-        <p className="text-sm text-slate-500 mt-0.5">{caregiver?.relationship} · ยืนยันข้อมูลสุขภาพแทนแพทย์ก่อน review</p>
-      </section>
-
-      <Button 
-        className="w-full rounded-2xl bg-gradient-to-r from-rose-500 to-red-600 hover:from-rose-600 hover:to-red-700 text-white shadow-lg hover:shadow-red-500/25 active:scale-[0.98] transition-all duration-300 font-bold border-none py-3 h-12 flex items-center justify-center gap-2" 
-        onClick={logout}
-      >
-        <LogOut className="h-5 w-5" />
-        ออกจากระบบ
-      </Button>
-    </MobileShell>
-  );
+    </section>
+    <section className="flex items-start gap-3 rounded-2xl bg-sky-50/80 p-5">
+      <HeartHandshake className="mt-1 h-6 w-6 shrink-0 text-sky-600" />
+      <div><h3 className="text-xs font-medium text-slate-500">คนที่ช่วยดูแลคุณ</h3><p className="mt-1 text-base font-bold text-slate-800">{caregiver?.name || "ยังไม่มีผู้ดูแลที่เชื่อมต่อ"}</p>{caregiver && <p className="mt-1 text-sm leading-6 text-slate-500">{caregiver.relationship}</p>}</div>
+    </section>
+    <Button variant="ghost" className="min-h-12 w-full gap-2 text-rose-600 hover:bg-rose-50 hover:text-rose-700" onClick={logout}><LogOut className="h-4 w-4" />ออกจากระบบ</Button>
+  </MobileShell>;
 }

@@ -1,144 +1,30 @@
 "use client";
-
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Activity, Check, HeartPulse, X, Bot } from "lucide-react";
+import { Check, HeartPulse, Sparkles, ChevronDown, ArrowUpRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MobileShell } from "@/components/layouts/mobile-shell";
-import { MultiMetricChart } from "@/components/health/charts";
+import { MobileHealthChart } from "@/components/mobile/health-chart";
+import { ProfileIdentity } from "@/components/health/health-passport";
 import { useMockStore } from "@/lib/hooks/use-mock-store";
 import { updateRecordStatus, confirmTaskStatus } from "@/lib/services/mock-store";
 import { formatThaiDate } from "@/lib/utils";
-
 import { useAuth } from "@/lib/hooks/use-auth";
-
-export default function CaregiverPatientPage() {
-  const { db, setDb } = useMockStore();
-  const { user } = useAuth();
-  const caregiver = db.caregivers.find(c => c.email === user?.email) || db.caregivers[0];
-  const patient = db.patients.find((item) => item.id === caregiver.patientId) || db.patients[0];
-  const records = db.healthRecords.filter((item) => item.patientId === patient.id);
-  const pending = records.filter((item) => item.confirmationStatus === "pending").slice(-6).reverse();
-  const pendingTasks = db.carePlans
-    .filter((p) => p.patientId === patient.id)
-    .flatMap((p) =>
-      p.tasks
-        .filter((t) => t.pendingConfirm)
-        .map((t) => ({ ...t, planId: p.id }))
-    );
-
-  return (
-    <MobileShell role="caregiver" title="ผู้ป่วย">
-      <article className="flex items-center gap-4 rounded-3xl border bg-white p-5 shadow-card">
-        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-sky-100 text-sky-700">
-          <HeartPulse className="h-7 w-7" />
-        </div>
-        <div>
-          <h2 className="text-xl font-bold">{patient.name}</h2>
-          <p className="text-sm text-slate-500">{patient.diagnosis.join(" · ")}</p>
-        </div>
-      </article>
-
-      {/* AI Assistant Banner */}
-      <section className="bg-gradient-to-r from-sky-500 to-indigo-500 text-white shadow-sm rounded-3xl overflow-hidden relative p-4 flex items-center justify-between">
-        <div className="absolute right-0 top-0 h-24 w-24 rounded-full bg-white/10 -translate-y-8 translate-x-8 blur-xl" />
-        <div className="flex items-center gap-3 relative z-10">
-          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-sky-600 shadow-md shrink-0">
-            <Bot className="h-5.5 w-5.5" />
-          </div>
-          <div>
-            <p className="text-xs font-black">วิเคราะห์อาการกับผู้ช่วย AI</p>
-            <p className="text-[10px] text-white/80 mt-0.5">ปรึกษาแพทย์ปัญญาประดิษฐ์จำลองเกี่ยวกับแผนการดูแลคนไข้</p>
-          </div>
-        </div>
-        <Button size="sm" variant="secondary" asChild className="rounded-xl font-bold text-sky-700 bg-white hover:bg-sky-50 shrink-0 relative z-10">
-          <Link href="/caregiver/ai">เริ่มสนทนา</Link>
-        </Button>
-      </section>
-
-      <Tabs defaultValue="monitoring">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="monitoring">Monitoring</TabsTrigger>
-          <TabsTrigger value="confirm">ยืนยัน</TabsTrigger>
-          <TabsTrigger value="timeline">Timeline</TabsTrigger>
-        </TabsList>
-        <TabsContent value="monitoring" className="space-y-4">
-          <MultiMetricChart records={records} />
-        </TabsContent>
-        <TabsContent value="confirm" className="space-y-4">
-          {/* Health Records Section */}
-          <div className="space-y-2">
-            <h4 className="text-xs font-bold text-slate-400 pl-1 uppercase tracking-wider">บันทึกระดับสัญญาณชีพค้างอนุมัติ ({pending.length})</h4>
-            {pending.length ? pending.map((record) => (
-              <article key={record.id} className="space-y-3 rounded-2xl border border-sky-50 bg-white p-4 shadow-sm">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      {record.confirmationStatus === "pending" && (
-                        <span className="h-2 w-2 rounded-full bg-rose-500 shrink-0" />
-                      )}
-                      <p className="font-bold text-slate-800">BP {record.systolic}/{record.diastolic} · น้ำตาล {record.bloodSugar}</p>
-                    </div>
-                    <p className="mt-1 text-xs text-slate-500">{formatThaiDate(record.date)} · บันทึกโดยผู้ป่วย</p>
-                  </div>
-                  <Badge tone="yellow">รอยืนยัน</Badge>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <Button variant="success" size="sm" onClick={() => setDb((current) => updateRecordStatus(current, record.id, "confirmed"))}><Check className="h-4 w-4" /> ยืนยันผล</Button>
-                  <Button variant="outline" size="sm" onClick={() => setDb((current) => updateRecordStatus(current, record.id, "rejected"))}><X className="h-4 w-4" /> ปฏิเสธ</Button>
-                </div>
-              </article>
-            )) : (
-              <div className="text-center py-4 bg-slate-50/50 rounded-2xl border border-dashed border-slate-200 text-xs text-slate-400">
-                ไม่มีข้อมูลสัญญาณชีพค้างอนุมัติ
-              </div>
-            )}
-          </div>
-
-          {/* Care Plan Checklist Section */}
-          <div className="space-y-2 pt-2">
-            <h4 className="text-xs font-bold text-slate-400 pl-1 uppercase tracking-wider">การปฏิบัติงานตามแผนค้างอนุมัติ ({pendingTasks.length})</h4>
-            {pendingTasks.length ? pendingTasks.map((task) => (
-              <article key={task.id} className="space-y-3 rounded-2xl border border-sky-50 bg-white p-4 shadow-sm">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      {task.pendingConfirm && (
-                        <span className="h-2 w-2 rounded-full bg-rose-500 shrink-0" />
-                      )}
-                      <p className="font-bold text-slate-800">{task.title}</p>
-                    </div>
-                    <p className="mt-1 text-xs text-slate-500">{task.time} · {task.detail}</p>
-                  </div>
-                  <Badge tone="yellow">
-                    รอยืนยัน ({task.pendingConfirm === "completed" ? "ทำแล้ว" : task.pendingConfirm === "skipped" ? "ข้าม" : "ทำไม่ได้"})
-                  </Badge>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <Button variant="success" size="sm" onClick={() => setDb((current) => confirmTaskStatus(current, task.planId, task.id, true))}><Check className="h-4 w-4" /> อนุมัติ</Button>
-                  <Button variant="destructive" size="sm" onClick={() => setDb((current) => confirmTaskStatus(current, task.planId, task.id, false))}><X className="h-4 w-4" /> ปฏิเสธ</Button>
-                </div>
-              </article>
-            )) : (
-              <div className="text-center py-4 bg-slate-50/50 rounded-2xl border border-dashed border-slate-200 text-xs text-slate-400">
-                ไม่มีกิจกรรมของคนไข้ค้างอนุมัติ
-              </div>
-            )}
-          </div>
-        </TabsContent>
-        <TabsContent value="timeline" className="space-y-3">
-          {records.slice(-10).reverse().map((record) => (
-            <div key={record.id} className="flex gap-3 rounded-2xl bg-white p-4 shadow-card">
-              <Activity className="mt-1 h-5 w-5 text-sky-600" />
-              <div>
-                <p className="font-bold">{formatThaiDate(record.date)}</p>
-                <p className="text-sm text-slate-500">BP {record.systolic}/{record.diastolic}, น้ำตาล {record.bloodSugar}, ยา {record.medicationTaken ? "ครบ" : "ขาด"}</p>
-              </div>
-            </div>
-          ))}
-        </TabsContent>
-      </Tabs>
-    </MobileShell>
-  );
+export default function CaregiverPatientPage(){
+ const {db,setDb}=useMockStore();const {user}=useAuth();const caregiver=db.caregivers.find(c=>c.email===user?.email)||db.caregivers[0];const patient=db.patients.find(p=>p.id===caregiver.patientId)||db.patients[0];
+ const records=db.healthRecords.filter(r=>r.patientId===patient.id);const pending=records.filter(r=>r.confirmationStatus==="pending").slice().reverse();const tasks=db.carePlans.filter(p=>p.patientId===patient.id).flatMap(p=>p.tasks.filter(t=>t.pendingConfirm).map(t=>({...t,planId:p.id})));
+ const [tab,setTab]=useState("monitoring");useEffect(()=>{if(new URLSearchParams(window.location.search).get("tab")==="confirm")setTab("confirm");},[]);
+ return <MobileShell role="caregiver" title="ผู้ป่วย"><ProfileIdentity name={patient.name} detail={`อายุ ${patient.age} ปี · ${patient.id}`} label="คนที่คุณดูแล"><details className="group mx-5 border-t border-dashed border-slate-200"><summary className="flex min-h-14 items-center justify-between text-sm text-slate-500">ข้อมูลสุขภาพสำคัญ<ChevronDown className="h-4 w-4 group-open:rotate-180"/></summary><dl className="space-y-3 pb-5 text-sm"><div><dt className="text-xs text-slate-500">โรคประจำตัว</dt><dd className="mt-1">{patient.diagnosis.join(" · ")}</dd></div><div><dt className="text-xs text-slate-500">ยาที่แพ้</dt><dd className="mt-1 font-semibold text-rose-600">{patient.allergies.join(", ")||"ไม่มีประวัติแพ้ยา"}</dd></div><div><dt className="text-xs text-slate-500">ยาที่ใช้ประจำ</dt><dd className="mt-1">{patient.medications.join(", ")}</dd></div></dl></details></ProfileIdentity>
+  <Link href="/caregiver/ai" className="flex min-h-12 items-center gap-2 rounded-full bg-[#eee9fa] px-4 text-sm font-medium text-violet-700"><Sparkles className="h-4 w-4"/><span className="flex-1">ถามผู้ช่วยเรื่องการดูแล</span><ArrowUpRight className="h-4 w-4"/></Link>
+  <Tabs value={tab} onValueChange={setTab}><TabsList className="grid w-full grid-cols-3"><TabsTrigger value="monitoring">สุขภาพ</TabsTrigger><TabsTrigger value="confirm">ยืนยัน{pending.length+tasks.length>0&&<span className="ml-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-sky-100 px-1 text-[10px] text-sky-800">{pending.length+tasks.length}</span>}</TabsTrigger><TabsTrigger value="timeline">ย้อนหลัง</TabsTrigger></TabsList>
+   <TabsContent value="monitoring"><MobileHealthChart records={records}/></TabsContent>
+   <TabsContent value="confirm" className="space-y-6">
+    {!pending.length&&!tasks.length&&<div className="py-9 text-center"><span className="mx-auto flex h-16 w-16 items-center justify-center rounded-[45%_55%_55%_45%] bg-emerald-100"><Check className="h-7 w-7 text-emerald-600"/></span><h2 className="mt-4 text-lg font-semibold">เรียบร้อยครบแล้ว</h2><p className="mt-1 text-sm text-slate-500">ไม่มีบันทึกที่รอยืนยัน</p></div>}
+    {pending.length>0&&<section className="care-sheet p-5"><h3 className="mobile-section-title">บันทึกสุขภาพ</h3><div className="mt-2 divide-y divide-slate-100">{pending.map(record=><article key={record.id} className="py-4"><p className="text-sm font-semibold">ความดัน {record.systolic}/{record.diastolic}</p><p className="mt-1 text-sm text-slate-500">น้ำตาล {record.bloodSugar} mg/dL</p><p className="mt-1 text-xs text-slate-500">{formatThaiDate(record.date)} · {record.source==="patient"?"ผู้ป่วยบันทึก":record.source==="caregiver"?"ผู้ดูแลบันทึก":"อุปกรณ์บันทึก"}</p><details className="mt-1"><summary className="flex min-h-11 items-center justify-between text-xs text-sky-700">ค่าอื่น ๆ<ChevronDown className="h-3 w-3"/></summary><p className="pb-2 text-xs leading-6 text-slate-500">ชีพจร {record.heartRate} ครั้ง/นาที · น้ำหนัก {record.weight} กก. · นอน {record.sleepHours} ชม.</p></details><div className="mt-2 grid grid-cols-2 gap-2"><Button className="rounded-full" onClick={()=>setDb(updateRecordStatus(db,record.id,"confirmed"))}>ยืนยัน</Button><Button variant="outline" className="rounded-full" onClick={()=>setDb(updateRecordStatus(db,record.id,"rejected"))}>ให้ตรวจอีกครั้ง</Button></div></article>)}</div></section>}
+    {tasks.length>0&&<section className="care-sheet p-5"><h3 className="mobile-section-title">กิจกรรมตามแผน</h3><div className="mt-2 divide-y divide-slate-100">{tasks.map(task=><article key={task.id} className="py-4"><p className="text-sm font-semibold">{task.title}</p><p className="mt-1 text-xs text-slate-500">{task.time} น. · ผู้ป่วย{task.pendingConfirm==="completed"?"ทำแล้ว":task.pendingConfirm==="skipped"?"ข้ามกิจกรรม":"ทำไม่ได้"}</p><p className="mt-2 text-sm leading-6 text-slate-500">{task.detail}</p><div className="mt-4 grid grid-cols-2 gap-2"><Button className="rounded-full" onClick={()=>setDb(confirmTaskStatus(db,task.planId,task.id,true))}>ยืนยัน</Button><Button variant="outline" className="rounded-full" onClick={()=>setDb(confirmTaskStatus(db,task.planId,task.id,false))}>ให้ตรวจอีกครั้ง</Button></div></article>)}</div></section>}
+   </TabsContent>
+   <TabsContent value="timeline"><ol className="divide-y divide-slate-200/60">{records.slice(-10).reverse().map(record=><li key={record.id} className="flex items-start gap-3 py-4"><HeartPulse className="mt-1 h-4 w-4 shrink-0 text-sky-500"/><div><p className="text-sm font-semibold">{formatThaiDate(record.date)}</p><p className="mt-1 text-xs leading-6 text-slate-500">ความดัน {record.systolic}/{record.diastolic}<br/>น้ำตาล {record.bloodSugar} mg/dL · {record.medicationTaken?"ทานยาแล้ว":"ยังไม่ได้ทานยา"}</p></div></li>)}</ol>{!records.length&&<p className="py-8 text-center text-sm text-slate-500">ยังไม่มีบันทึกสุขภาพ</p>}</TabsContent>
+  </Tabs>
+ </MobileShell>;
 }

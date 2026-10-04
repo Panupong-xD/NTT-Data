@@ -49,6 +49,7 @@ export interface Caregiver {
   relationship: string;
   email: string;
   mcsiScore: number;
+  wellbeingCheckIn?: { date: string; energy: number; rest: number; worry: number };
 }
 
 export interface HealthRecord {
