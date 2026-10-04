@@ -59,7 +59,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: ./
-      Handler: handler.handler
+      Handler: dist/handler.handler
       Environment:
         Variables:
           DYNAMODB_TABLE: !Ref HealthcareAgentTable

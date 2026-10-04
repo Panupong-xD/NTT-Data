@@ -96,26 +96,7 @@ export function MockChat({
     setAgentPlanningStep("3. ประมวลผลคำตอบพร้อมตรวจสอบความปลอดภัยทางคลินิก (Synthesizing)...");
 
     try {
-      const answer = await askAI(
-        [
-          "=== System Instructions ===",
-          "คุณคือผู้ช่วย AI ส่วนตัวด้านสุขภาพ (Agentic Healthcare Assistant)",
-          "ตอบคำถามของผู้ใช้โดยตรงอย่างสุภาพ ชัดเจน และเข้าอกเข้าใจ",
-          "หากผู้ใช้ส่งข้อความทักทายทั่วไป ให้ตอบทักทายกลับสั้นๆ อย่างเป็นมิตรและถามว่ามีอะไรให้ช่วยเหลือในวันนี้",
-          "รูปแบบการตอบ: กระชับ มีการขึ้นบรรทัดใหม่ แบ่งย่อหน้าสั้นๆ หรือใช้หัวข้อย่อย (Bullet points)",
-          mode === "patient"
-            ? "บทบาท: ผู้ช่วยดูแลสุขภาพผู้ป่วย (อ้างอิง diagnosis, medication, care plan, blood pressure, blood sugar, exercise, diet, appointments)"
-            : "บทบาท: ผู้ช่วยส่วนตัวของผู้ดูแลคนไข้ (อ้างอิง diagnosis, care plan, medication, measurements, doctor notes, burnout support)",
-          "",
-          "=== User Profile & Vitals Context ===",
-          context || "ไม่มีข้อมูลบริบทเพิ่มเติม",
-          "",
-          "=== User Message ===",
-          userQuestion
-        ]
-          .filter(Boolean)
-          .join("\n")
-      );
+      const answer = await askAI(userQuestion);
 
       // Check if action proposal should be synthesized for Human-in-the-Loop criteria
       const isActionOriented = 

@@ -10,5 +10,5 @@
     "forceConsistentCasingInFileNames": true,
     "outDir": "./dist"
   },
-  "include": ["handler.ts"]
+  "include": ["handler.ts", "chatHandler.ts", "db.ts", "approvalHandler.ts"]
 }
