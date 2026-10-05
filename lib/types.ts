@@ -96,6 +96,15 @@ export interface CarePlan {
   followUp: string[];
   lifestyle: string[];
   tasks: CareTask[];
+  appointments?: CareAppointment[];
+}
+
+export interface CareAppointment {
+  id: string;
+  date: string; // YYYY-MM-DD, local date in Thailand
+  time: string;
+  title: string;
+  location?: string;
 }
 
 export interface NotificationItem {

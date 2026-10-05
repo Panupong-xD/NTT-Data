@@ -5,7 +5,8 @@ import { Camera, CheckCircle2, Loader2, Trash2, Upload, Utensils, X } from "luci
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
+import { HealthLiquidTabs } from "@/components/mobile/liquid-tabs";
 import { MobileShell } from "@/components/layouts/mobile-shell";
 import { MobileHealthChart } from "@/components/mobile/health-chart";
 import { HealthCharm } from "@/components/mobile/health-charm";
@@ -562,7 +563,7 @@ export default function PatientHealthPage() {
   return (
     <MobileShell role="patient" title="สุขภาพ">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4"><TabsTrigger value="records">บันทึก</TabsTrigger><TabsTrigger value="charts">แนวโน้ม</TabsTrigger><TabsTrigger value="food">มื้ออาหาร</TabsTrigger><TabsTrigger value="ai">ผู้ช่วย</TabsTrigger></TabsList>
+        <HealthLiquidTabs value={activeTab} />
         <TabsContent value="records" className="space-y-6">
           <section className="care-sheet p-5">
             <header className="mb-5"><h2 className="mobile-section-title">วันนี้ร่างกายเป็นยังไง?</h2><p className="mt-1 text-xs text-slate-500">กรอกเอง หรือให้รูปช่วยอ่านค่า</p></header>

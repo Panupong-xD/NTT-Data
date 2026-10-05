@@ -176,6 +176,14 @@ function buildCarePlans(patients: Patient[]): CarePlan[] {
     measurement: ["วัดความดันเช้าและก่อนนอน", "บันทึกน้ำตาลหลังอาหาร 2 ชั่วโมง"],
     followUp: ["พบแพทย์ตามนัดใน 14 วัน", "ส่งรายงานก่อนวันนัด 1 วัน"],
     lifestyle: ["นอนก่อน 22:30 น.", "ดื่มน้ำ 6-8 แก้ว", "ฝึกหายใจช้า 3 นาทีเมื่อเครียด"],
+    // Preserve the appointment shown by the original prototype calendar.
+    appointments: [{
+      id: `${patient.id}-appointment-followup`,
+      date: "2026-07-16",
+      time: "09:30",
+      title: "พบแพทย์ติดตามเบาหวานและความดัน",
+      location: patient.hospital
+    }],
     tasks: [
       {
         id: `${patient.id}-task-med`,

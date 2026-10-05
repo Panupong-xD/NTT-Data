@@ -40,7 +40,13 @@ export function loadMockStore(): MockDatabase {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(mockDb));
       return mockDb;
     }
-    return parsed;
+    return {
+      ...parsed,
+      carePlans: parsed.carePlans.map(plan => ({
+        ...plan,
+        appointments: plan.appointments ?? mockDb.carePlans.find(seed => seed.id === plan.id)?.appointments
+      }))
+    };
   } catch {
     const fresh = createMockDatabase();
     localStorage.setItem(STORAGE_KEY, JSON.stringify(fresh));
