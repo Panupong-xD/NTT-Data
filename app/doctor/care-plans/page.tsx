@@ -1,371 +1,67 @@
 "use client";
 
-import { useState } from "react";
-import { CheckCircle2, ClipboardList, Loader2, Sparkles, Edit2, Plus, X, Save } from "lucide-react";
+import * as Dialog from "@radix-ui/react-dialog";
+import { useEffect, useState } from "react";
+import { CalendarDays, Check, ClipboardList, Dumbbell, Edit3, Loader2, Pill, Plus, Save, Sparkles, Utensils, X, Heart } from "lucide-react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DoctorShell } from "@/components/layouts/doctor-shell";
+import { EmptyState, PatientAvatar, planStatusLabel, SearchField, SectionHeading } from "@/components/doctor/ui";
+import { MarkdownRenderer } from "@/components/ui/markdown-renderer";
 import { useMockStore } from "@/lib/hooks/use-mock-store";
 import { publishCarePlan } from "@/lib/services/mock-store";
 import { askAI } from "@/lib/services/ai/client";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { MarkdownRenderer } from "@/components/ui/markdown-renderer";
+import { CarePlan } from "@/lib/types";
+import { formatThaiDate } from "@/lib/utils";
 
+const categories = [{ key:"medication", label:"ยา", icon:Pill },{ key:"diet", label:"อาหาร", icon:Utensils },{ key:"exercise", label:"การออกกำลังกาย", icon:Dumbbell },{ key:"measurement", label:"การวัดค่า", icon:ClipboardList },{ key:"followUp", label:"การติดตาม", icon:CalendarDays },{ key:"lifestyle", label:"การใช้ชีวิต", icon:Heart }] as const;
+type Fields = { summary: string } & Record<(typeof categories)[number]["key"], string>;
+const emptyFields: Fields = { summary:"", medication:"", diet:"", exercise:"", measurement:"", followUp:"", lifestyle:"" };
+function fieldsOf(plan?: CarePlan): Fields { return plan ? { summary:plan.summary, ...Object.fromEntries(categories.map(c => [c.key, plan[c.key].join("\n")])) } as Fields : { ...emptyFields }; }
+function arraysOf(fields: Fields) { return Object.fromEntries(categories.map(c => [c.key, fields[c.key].split("\n").map(s => s.trim()).filter(Boolean)])) as Pick<CarePlan,"medication"|"diet"|"exercise"|"measurement"|"followUp"|"lifestyle">; }
+function PlanFields({ fields, onChange }: { fields: Fields; onChange: (fields: Fields) => void }) { return <div className="doctor-form-grid"><label className="doctor-field wide"><span>สรุปแผนดูแล</span><textarea rows={3} value={fields.summary} onChange={e => onChange({ ...fields, summary:e.target.value })} placeholder="คำแนะนำหลักที่อยากให้ผู้ป่วยนำไปใช้" required /></label>{categories.map(c => <label className="doctor-field" key={c.key}><span>{c.label}</span><textarea rows={2} value={fields[c.key]} onChange={e => onChange({ ...fields, [c.key]:e.target.value })} placeholder="หนึ่งคำแนะนำต่อหนึ่งบรรทัด" /></label>)}</div>; }
 export default function DoctorCarePlansPage() {
   const { db, setDb } = useMockStore();
-  const [rewritingId, setRewritingId] = useState<string | null>(null);
-
-  // Inline editing state
-  const [editingPlanId, setEditingPlanId] = useState<string | null>(null);
-  const [editSummary, setEditSummary] = useState("");
-  const [editMedication, setEditMedication] = useState("");
-  const [editDiet, setEditDiet] = useState("");
-  const [editExercise, setEditExercise] = useState("");
-
-  // Create new plan state
-  const [showCreateForm, setShowCreateForm] = useState(false);
-  const [selectedPatientId, setSelectedPatientId] = useState(db.patients[0]?.id || "");
-  const [newSummary, setNewSummary] = useState("");
-  const [newMedication, setNewMedication] = useState("");
-  const [newDiet, setNewDiet] = useState("");
-  const [newExercise, setNewExercise] = useState("");
-
-  function startEdit(plan: typeof db.carePlans[0]) {
-    setEditingPlanId(plan.id);
-    setEditSummary(plan.summary);
-    setEditMedication(plan.medication[0] || "");
-    setEditDiet(plan.diet[0] || "");
-    setEditExercise(plan.exercise[0] || "");
+  const [selectedId, setSelectedId] = useState(db.carePlans[0]?.id || "");
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState("all");
+  const [editing, setEditing] = useState(false);
+  const [fields, setFields] = useState<Fields>(emptyFields);
+  const [rewriting, setRewriting] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createPatient, setCreatePatient] = useState(db.patients[0]?.id || "");
+  const [createFields, setCreateFields] = useState<Fields>(fieldsOf(db.carePlans.find(p => p.patientId === createPatient)));
+  useEffect(() => { const id = new URLSearchParams(window.location.search).get("patient"); const plan = db.carePlans.find(p => p.patientId === id); if (plan) setSelectedId(plan.id); }, []);
+  const selected = db.carePlans.find(p => p.id === selectedId);
+  const patient = db.patients.find(p => p.id === selected?.patientId);
+  const plans = db.carePlans.filter(p => (filter === "all" || (filter === "draft" ? p.status !== "published" : p.status === "published")) && `${db.patients.find(patient => patient.id === p.patientId)?.name} ${p.patientId}`.toLowerCase().includes(query.toLowerCase()));
+  function saveEdit() {
+    if (!selected || !fields.summary.trim()) { toast.error("กรุณาระบุสรุปแผนดูแล"); return; }
+    setDb(current => ({ ...current, carePlans:current.carePlans.map(p => p.id === selected.id ? { ...p, ...arraysOf(fields), summary:fields.summary.trim(), status:"draft", updatedAt:new Date().toISOString() } : p) }));
+    setEditing(false); toast.success("บันทึกร่างแผนแล้ว");
   }
-
-  function saveEdit(planId: string) {
-    if (!editSummary.trim()) {
-      toast.error("กรุณาระบุรายละเอียดแผนดูแล");
-      return;
-    }
-    setDb((current) => ({
-      ...current,
-      carePlans: current.carePlans.map((item) =>
-        item.id === planId
-          ? {
-              ...item,
-              summary: editSummary,
-              medication: [editMedication],
-              diet: [editDiet],
-              exercise: [editExercise],
-              status: "draft" as const
-            }
-          : item
-      )
-    }));
-    toast.success("บันทึกการแก้ไขแผนการดูแลเรียบร้อยแล้ว");
-    setEditingPlanId(null);
+  function saveCreate() {
+    if (!createPatient || !createFields.summary.trim()) { toast.error("กรุณาเลือกผู้ป่วยและเขียนสรุปแผน"); return; }
+    const existing = db.carePlans.find(p => p.patientId === createPatient);
+    const plan: CarePlan = { ...(existing || { id:`PLAN-${Date.now()}`, tasks:[] }), patientId:createPatient, doctorId:db.doctors[0]?.id || "DOC-001", status:"draft", updatedAt:new Date().toISOString(), summary:createFields.summary.trim(), ...arraysOf(createFields) };
+    setDb(current => ({ ...current, carePlans:existing ? current.carePlans.map(p => p.id === existing.id ? plan : p) : [...current.carePlans,plan] }));
+    setSelectedId(plan.id); setEditing(false); setFilter("all"); setQuery(""); setCreateOpen(false); toast.success("บันทึกร่างแผนแล้ว");
   }
-
-  function handleCreatePlan() {
-    if (!selectedPatientId || !newSummary.trim()) {
-      toast.error("กรุณาเลือกผู้ป่วยและระบุรายละเอียดแผนดูแล");
-      return;
-    }
-
-    const existingIndex = db.carePlans.findIndex((p) => p.patientId === selectedPatientId);
-    const newPlanObject = {
-      id: existingIndex >= 0 ? db.carePlans[existingIndex].id : `PLAN-${Date.now()}`,
-      patientId: selectedPatientId,
-      doctorId: db.doctors[0]?.id || "DOC-1",
-      status: "draft" as const,
-      updatedAt: new Date().toISOString(),
-      summary: newSummary,
-      medication: [newMedication],
-      diet: [newDiet],
-      exercise: [newExercise],
-      measurement: ["วัดความดันเช้า-เย็น", "ตรวจระดับน้ำตาลก่อนอาหาร"],
-      followUp: ["นัดพบแพทย์ทุก 3 เดือน"],
-      lifestyle: ["ลดเค็ม ลดหวาน พักผ่อนให้เพียงพอ"],
-      tasks: []
-    };
-
-    setDb((current) => {
-      const nextPlans = [...current.carePlans];
-      if (existingIndex >= 0) {
-        nextPlans[existingIndex] = newPlanObject;
-      } else {
-        nextPlans.push(newPlanObject);
-      }
-      return {
-        ...current,
-        carePlans: nextPlans
-      };
-    });
-
-    const patient = db.patients.find((p) => p.id === selectedPatientId);
-    toast.success(`สร้างแผนการดูแลสำหรับ ${patient?.name || "ผู้ป่วย"} เรียบร้อยแล้ว`);
-    setShowCreateForm(false);
-    setNewSummary("");
-    setNewMedication("");
-    setNewDiet("");
-    setNewExercise("");
-  }
-
-  async function handleRewrite(plan: typeof db.carePlans[0]) {
-    const patient = db.patients.find((item) => item.id === plan.patientId)!;
-    setRewritingId(plan.id);
+  async function rewrite() {
+    if (!selected || !patient) return;
+    setRewriting(true);
     try {
-      const answer = await askAI(
-        [
-          "ตอบเป็นภาษาไทยในรูปแบบแผนดูแลที่บ้านสำหรับแพทย์ สรุปสั้นๆ 1 ย่อหน้า ไม่เกิน 3 ประโยค",
-          `ผู้ป่วย: ${patient.name}`,
-          `ข้อมูลวินิจฉัยโรค: ${patient.diagnosis.join(", ")}`,
-          `ยาปัจจุบัน: ${patient.medications.join(", ")}`,
-          `ร่างเดิมของแผนการดูแล: ${plan.summary}`
-        ].join("\n")
-      );
-      
-      setDb((current) => ({
-        ...current,
-        carePlans: current.carePlans.map((item) =>
-          item.id === plan.id ? { ...item, summary: answer, status: "draft" as const } : item
-        )
-      }));
-      toast.success(`ปรับปรุงแผนดูแลของ ${patient.name} เรียบร้อยแล้ว`);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "เรียกใช้งาน AI ไม่สำเร็จ");
-    } finally {
-      setRewritingId(null);
-    }
+      const answer = await askAI(["ตอบเป็นภาษาไทย สรุปแผนดูแลที่บ้านสำหรับแพทย์ 1 ย่อหน้า ไม่เกิน 3 ประโยค", `ผู้ป่วย: ${patient.name}`, `การวินิจฉัย: ${patient.diagnosis.join(", ")}`, `ยา: ${patient.medications.join(", ")}`, `ร่างเดิม: ${selected.summary}`].join("\n"), undefined, { patientId:patient.id });
+      if (!answer.trim()) throw new Error("ยังไม่ได้รับคำแนะนำ กรุณาลองอีกครั้ง");
+      setDb(current => ({ ...current, carePlans:current.carePlans.map(p => p.id === selected.id ? { ...p, summary:answer, status:"draft", updatedAt:new Date().toISOString() } : p) }));
+      toast.success("ปรับร่างแล้ว กรุณาตรวจสอบก่อนส่งต่อ");
+    } catch (error) { toast.error(error instanceof Error ? error.message : "ปรับแผนไม่สำเร็จ"); }
+    finally { setRewriting(false); }
   }
-
-  return (
-    <DoctorShell title="Care Plans">
-      <div className="space-y-6">
-        {/* Create Plan Toggle Section */}
-        <div className="flex justify-between items-center bg-white p-4 rounded-2xl border border-sky-100 shadow-sm">
-          <div>
-            <h3 className="font-bold text-slate-800">จัดการแผนดูแลรักษาผู้ป่วยต่อเนื่อง</h3>
-            <p className="text-xs text-slate-500">สร้างแผนโภชนาการ ยา และการออกกำลังกายให้ผู้ป่วยรายบุคคล</p>
-          </div>
-          <Button 
-            onClick={() => setShowCreateForm(!showCreateForm)}
-            className="bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-700 hover:to-indigo-700 text-white shadow-md active:scale-[0.98] transition-all rounded-2xl flex items-center gap-2 border-none"
-          >
-            {showCreateForm ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-            {showCreateForm ? "ปิดฟอร์ม" : "เขียนแผนดูแลใหม่"}
-          </Button>
-        </div>
-
-        {/* Create Plan Form Card */}
-        {showCreateForm && (
-          <Card className="border border-sky-100 shadow-md">
-            <CardHeader>
-              <CardTitle className="text-slate-800 flex items-center gap-2">
-                <ClipboardList className="h-5 w-5 text-sky-600" />
-                กรอกรายละเอียดแผนดูแลใหม่ (New Custom Care Plan)
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-600 pl-1">เลือกผู้ป่วย</label>
-                <select
-                  value={selectedPatientId}
-                  onChange={(e) => setSelectedPatientId(e.target.value)}
-                  className="w-full rounded-2xl border border-sky-100 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm focus:border-sky-300 focus:outline-none"
-                >
-                  {db.patients.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name} ({p.id}) · {p.diagnosis.join(", ")}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-600 pl-1">สรุปแผนการดูแลรักษา (Summary)</label>
-                <Textarea
-                  value={newSummary}
-                  onChange={(e) => setNewSummary(e.target.value)}
-                  placeholder="เช่น ผู้ป่วยควรควบคุมปริมาณคาร์โบไฮเดรตในอาหารแต่ละมื้อ และรับประทานยาอย่างเคร่งครัด..."
-                  rows={3}
-                />
-              </div>
-
-              <div className="grid gap-4 md:grid-cols-3">
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-600 pl-1">การรับประทานยา (Medication)</label>
-                  <Input 
-                    value={newMedication} 
-                    onChange={(e) => setNewMedication(e.target.value)} 
-                    placeholder="เช่น ยา Metformin 500mg หลังอาหารเช้า-เย็น" 
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-600 pl-1">การควบคุมอาหาร (Diet)</label>
-                  <Input 
-                    value={newDiet} 
-                    onChange={(e) => setNewDiet(e.target.value)} 
-                    placeholder="เช่น ทานคาร์โบไฮเดรตต่ำ เลี่ยงผลไม้รสหวานจัด" 
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-600 pl-1">การออกกำลังกาย (Exercise)</label>
-                  <Input 
-                    value={newExercise} 
-                    onChange={(e) => setNewExercise(e.target.value)} 
-                    placeholder="เช่น เดินเร็ววันละ 30 นาที สัปดาห์ละ 5 วัน" 
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2">
-                <Button variant="outline" onClick={() => setShowCreateForm(false)} className="rounded-2xl">
-                  ยกเลิก
-                </Button>
-                <Button 
-                  onClick={handleCreatePlan}
-                  className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-750 text-white shadow-md active:scale-[0.98] border-none rounded-2xl"
-                >
-                  <Save className="h-4 w-4" /> สร้างและบันทึกแบบร่าง
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Care Plan Grid List */}
-        <div className="grid gap-5 xl:grid-cols-2">
-          {db.carePlans.slice(0, 12).map((plan) => {
-            const patient = db.patients.find((item) => item.id === plan.patientId)!;
-            const isRewriting = rewritingId === plan.id;
-            const isEditing = editingPlanId === plan.id;
-
-            return (
-              <Card key={plan.id} className="border border-sky-50 shadow-sm flex flex-col justify-between">
-                <div>
-                  <CardHeader className="flex-row items-start justify-between gap-4">
-                    <div className="min-w-0 flex-1">
-                      <CardTitle className="flex items-center gap-2 text-slate-800">
-                        <ClipboardList className="h-5 w-5 text-sky-600" /> 
-                        {patient?.name || "ผู้ป่วยนิรนาม"}
-                      </CardTitle>
-                      
-                      {isEditing ? (
-                        <div className="mt-2 space-y-1">
-                          <label className="text-[11px] font-bold text-slate-400">รายละเอียดคำแนะนำ (Summary)</label>
-                          <Textarea
-                            value={editSummary}
-                            onChange={(e) => setEditSummary(e.target.value)}
-                            className="text-sm mt-1"
-                            rows={3}
-                          />
-                        </div>
-                      ) : (
-                        <div className="mt-2 text-sm text-slate-600 leading-relaxed">
-                          <MarkdownRenderer content={plan.summary} />
-                        </div>
-                      )}
-                    </div>
-                    <Badge tone={plan.status === "published" ? "green" : "yellow"} className="shrink-0">
-                      {plan.status}
-                    </Badge>
-                  </CardHeader>
-
-                  <CardContent className="space-y-4">
-                    {/* Medication, Diet, Exercise Sections */}
-                    {isEditing ? (
-                      <div className="space-y-2 border-t pt-3">
-                        <div className="space-y-1">
-                          <label className="text-[11px] font-bold text-slate-500">Medication</label>
-                          <Input value={editMedication} onChange={(e) => setEditMedication(e.target.value)} />
-                        </div>
-                        <div className="space-y-1">
-                          <label className="text-[11px] font-bold text-slate-500">Diet</label>
-                          <Input value={editDiet} onChange={(e) => setEditDiet(e.target.value)} />
-                        </div>
-                        <div className="space-y-1">
-                          <label className="text-[11px] font-bold text-slate-500">Exercise</label>
-                          <Input value={editExercise} onChange={(e) => setEditExercise(e.target.value)} />
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="grid gap-3 md:grid-cols-3">
-                        <div className="rounded-2xl bg-sky-50/70 p-3 text-xs leading-5">
-                          <b className="text-sky-800">Medication</b>
-                          <br />
-                          {plan.medication[0] || "ไม่มีข้อกำหนด"}
-                        </div>
-                        <div className="rounded-2xl bg-emerald-50/70 p-3 text-xs leading-5">
-                          <b className="text-emerald-800">Diet</b>
-                          <br />
-                          {plan.diet[0] || "ไม่มีข้อกำหนด"}
-                        </div>
-                        <div className="rounded-2xl bg-orange-50/70 p-3 text-xs leading-5">
-                          <b className="text-orange-850">Exercise</b>
-                          <br />
-                          {plan.exercise[0] || "ไม่มีข้อกำหนด"}
-                        </div>
-                      </div>
-                    )}
-                  </CardContent>
-                </div>
-
-                {/* Card Actions Footer */}
-                <CardContent className="pt-0 border-t border-slate-50 mt-4 flex gap-2 justify-between items-center py-4">
-                  {isEditing ? (
-                    <div className="flex gap-2 w-full justify-end">
-                      <Button variant="outline" size="sm" onClick={() => setEditingPlanId(null)} className="rounded-xl">
-                        <X className="h-3.5 w-3.5" /> ยกเลิก
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        onClick={() => saveEdit(plan.id)}
-                        className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white border-none rounded-xl"
-                      >
-                        <Save className="h-3.5 w-3.5" /> บันทึก
-                      </Button>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="flex gap-2">
-                        {/* Edit Button */}
-                        <Button variant="outline" size="sm" onClick={() => startEdit(plan)} disabled={isRewriting} className="rounded-xl">
-                          <Edit2 className="h-3.5 w-3.5" /> Edit
-                        </Button>
-                        
-                        {/* AI Rewrite Button */}
-                        <Button variant="outline" size="sm" onClick={() => handleRewrite(plan)} disabled={isRewriting} className="rounded-xl">
-                          {isRewriting ? (
-                            <>
-                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                              Rewriting...
-                            </>
-                          ) : (
-                            <>
-                              <Sparkles className="h-3.5 w-3.5" />
-                              AI Rewrite
-                            </>
-                          )}
-                        </Button>
-                      </div>
-
-                      {/* Publish Button */}
-                      <Button 
-                        size="sm" 
-                        onClick={() => setDb((current) => publishCarePlan(current, plan))} 
-                        disabled={isRewriting}
-                        className="bg-sky-600 hover:bg-sky-700 text-white rounded-xl flex items-center gap-1"
-                      >
-                        <CheckCircle2 className="h-3.5 w-3.5" /> Publish
-                      </Button>
-                    </>
-                  )}
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-      </div>
-    </DoctorShell>
-  );
+  return <DoctorShell title="แผนดูแล" description="เปลี่ยนคำแนะนำให้เป็นแผนที่ผู้ป่วยนำไปใช้ได้ง่าย" action={<button className="doc-button" disabled={rewriting || editing} onClick={() => setCreateOpen(true)}><Plus size={17} />เขียนแผนดูแล</button>}>
+    <div className="doctor-master-detail"><aside className="doctor-directory"><SectionHeading title="แผนของผู้ป่วย"><span className="doctor-directory-count">{plans.length} แผน</span></SectionHeading><SearchField value={query} onChange={setQuery} /><div className="doctor-filter-chips">{[{ value:"all", label:"ทั้งหมด" },{ value:"draft", label:"รอส่ง" },{ value:"published", label:"ส่งแล้ว" }].map(f => <button key={f.value} aria-pressed={filter === f.value} onClick={() => setFilter(f.value)}>{f.label}</button>)}</div><div className="doctor-directory-list">{plans.map((plan,i) => { const person = db.patients.find(p => p.id === plan.patientId); return <button key={plan.id} disabled={editing || rewriting} aria-pressed={selectedId === plan.id} className={`doctor-directory-item${selectedId === plan.id ? " selected" : ""}`} onClick={() => setSelectedId(plan.id)}><PatientAvatar name={person?.name || "ผู้ป่วย"} index={i} /><div><b>{person?.name || plan.patientId}</b><small>{plan.status === "published" ? "ส่งให้ผู้ป่วยแล้ว" : planStatusLabel(plan.status)} · {plan.patientId}</small></div></button>; })}{!plans.length && <EmptyState title="ไม่พบแผนดูแล" detail="ลองเปลี่ยนคำค้นหรือตัวกรอง" />}</div></aside>
+      {selected && patient ? <article className="doctor-plan-paper"><div className="doctor-patient-header"><PatientAvatar name={patient.name} large index={1} /><div><h2>{patient.name}</h2><p>{patient.id} · อัปเดต {formatThaiDate(selected.updatedAt)}</p></div><span className={`doctor-status status-${selected.status === "published" ? "green" : "yellow"}`}>{planStatusLabel(selected.status)}</span></div>
+        {editing ? <><PlanFields fields={fields} onChange={setFields} /><div className="doctor-form-actions"><button className="doc-button secondary" onClick={() => setEditing(false)}>ยกเลิก</button><button className="doc-button" onClick={saveEdit} disabled={!fields.summary.trim()}><Save size={15} />บันทึกร่าง</button></div></> : <><div className="doctor-plan-summary"><h3>แนวทางการดูแลที่บ้าน</h3><MarkdownRenderer content={selected.summary} /></div><div className="doctor-plan-sections">{categories.map(c => <section className="doctor-plan-section" key={c.key}><h3><c.icon />{c.label}</h3>{selected[c.key].filter(Boolean).length ? <ul>{selected[c.key].filter(Boolean).map((line,i) => <li key={i}>{line}</li>)}</ul> : <p>ยังไม่ได้ระบุคำแนะนำ</p>}</section>)}</div><div className="doctor-form-actions"><p>ตรวจสอบแผนก่อนส่งให้ผู้ป่วยและผู้ดูแล</p><button className="doc-button secondary small" disabled={rewriting} onClick={() => { setFields(fieldsOf(selected)); setEditing(true); }}><Edit3 size={14} />แก้ไข</button><button className="doc-button secondary small" disabled={rewriting} onClick={rewrite}>{rewriting ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}ให้ผู้ช่วยปรับแผน</button><button className="doc-button small" disabled={rewriting || selected.status === "published"} onClick={() => { setDb(current => publishCarePlan(current,selected)); }}><Check size={14} />{selected.status === "published" ? "ส่งแผนแล้ว" : "อนุมัติและส่งแผน"}</button></div></>}
+      </article> : <section className="doctor-panel"><EmptyState title="ยังไม่มีแผนดูแล" detail="เริ่มเขียนคำแนะนำสำหรับผู้ป่วยของคุณ" /></section>}</div>
+      <Dialog.Root open={createOpen} onOpenChange={setCreateOpen}><Dialog.Portal><Dialog.Overlay className="doctor-modal-overlay" /><Dialog.Content className="doctor-modal"><Dialog.Title>เขียนแผนดูแล</Dialog.Title><Dialog.Description className="doctor-modal-description">บันทึกเป็นฉบับร่างก่อนส่งต่อให้ผู้ป่วย</Dialog.Description><Dialog.Close className="doctor-modal-close" aria-label="ปิดแบบฟอร์ม"><X size={20} /></Dialog.Close><label className="doctor-field"><span>ผู้ป่วย</span><select value={createPatient} onChange={e => { setCreatePatient(e.target.value); setCreateFields(fieldsOf(db.carePlans.find(p => p.patientId === e.target.value))); }}>{db.patients.map(p => <option key={p.id} value={p.id}>{p.name} · {p.id}</option>)}</select></label>{db.carePlans.some(p => p.patientId === createPatient) && <p className="text-xs text-sky-600 mb-5">มีแผนเดิม · บันทึกเพื่อปรับเป็นฉบับร่าง กิจกรรมและนัดหมายยังอยู่ครบ</p>}<PlanFields fields={createFields} onChange={setCreateFields} /><div className="doctor-form-actions"><Dialog.Close className="doc-button secondary">ยกเลิก</Dialog.Close><button className="doc-button" onClick={saveCreate} disabled={!createFields.summary.trim()}><Save size={15} />บันทึกร่าง</button></div></Dialog.Content></Dialog.Portal></Dialog.Root>
+  </DoctorShell>;
 }

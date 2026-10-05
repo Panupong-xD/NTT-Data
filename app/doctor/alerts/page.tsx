@@ -1,107 +1,26 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { AlertTriangle, CheckCircle2, Clock, ShieldCheck, XCircle } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import Link from "next/link";
+import { useState } from "react";
+import { ArrowUpRight, ClipboardCheck, HeartPulse } from "lucide-react";
 import { DoctorShell } from "@/components/layouts/doctor-shell";
-import { EarlyWarningCard } from "@/components/health/early-warning-card";
+import { ApprovalQueue } from "@/components/doctor/approval-queue";
+import { DoctorTabs, DoctorTabContent, EmptyState, PatientAvatar, RiskPill, SectionHeading } from "@/components/doctor/ui";
 import { useMockStore } from "@/lib/hooks/use-mock-store";
-import { getApprovals, submitApprovalDecision } from "@/lib/services/ai/client";
-import { ApprovalEntity } from "@/lib/types";
-import { toast } from "sonner";
+import { formatThaiDate } from "@/lib/utils";
 
 export default function DoctorAlertsPage() {
   const { db } = useMockStore();
-  const alerts = db.earlyWarnings.filter((item) => item.level !== "green");
-
-  const [approvals, setApprovals] = useState<ApprovalEntity[]>([]);
-
-  useEffect(() => {
-    getApprovals("PENDING").then(setApprovals).catch(console.warn);
-  }, []);
-
-  async function handleDecision(actionId: string, decision: "APPROVED" | "REJECTED") {
-    await submitApprovalDecision(actionId, decision, "DOC-001");
-    setApprovals((current) => current.filter((a) => a.actionId !== actionId));
-    toast.success(decision === "APPROVED" ? "อนุมัติคำสั่งเรียบร้อยแล้ว" : "ปฏิเสธคำสั่งแล้ว");
-  }
-
-  return (
-    <DoctorShell title="Alerts & Clinical Safeguards">
-      {approvals.length > 0 && (
-        <section className="mb-6 rounded-3xl border border-amber-200 bg-amber-50/50 p-5 shadow-card">
-          <header className="flex items-center gap-2 mb-3">
-            <ShieldCheck className="h-5 w-5 text-amber-600" />
-            <h3 className="text-sm font-bold text-amber-900">
-              คำขออนุมัติคำสั่งการรักษาที่ค้างพิจารณา ({approvals.length} รายการ - DynamoDB)
-            </h3>
-          </header>
-          <div className="space-y-3">
-            {approvals.map((app) => (
-              <div key={app.actionId} className="bg-white p-4 rounded-2xl border border-amber-200 flex items-start justify-between gap-4">
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-full">
-                      {app.patientName}
-                    </span>
-                    <span className="text-xs font-bold text-slate-900">{app.title}</span>
-                  </div>
-                  <p className="text-xs text-slate-600 mt-1 leading-relaxed">{app.description}</p>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    <strong>เหตุผล:</strong> {app.clinicalReason}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <Button
-                    size="sm"
-                    variant="success"
-                    className="h-8 text-xs font-bold px-3 gap-1 shadow-sm"
-                    onClick={() => handleDecision(app.actionId, "APPROVED")}
-                  >
-                    <CheckCircle2 className="h-3.5 w-3.5" />
-                    อนุมัติ
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-8 text-xs font-bold px-3 gap-1 text-slate-600 border-slate-300"
-                    onClick={() => handleDecision(app.actionId, "REJECTED")}
-                  >
-                    <XCircle className="h-3.5 w-3.5" />
-                    ปฏิเสธ
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
-        <div className="space-y-4">
-          {alerts.map((warning) => {
-            const patient = db.patients.find((item) => item.id === warning.patientId)!;
-            return (
-              <article key={warning.id} className="flex items-start gap-4 rounded-3xl border bg-white p-5 shadow-card">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-orange-50 text-orange-600">
-                  <AlertTriangle className="h-6 w-6" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <p className="font-bold">{patient.name}</p>
-                      <p className="mt-1 text-sm leading-6 text-slate-500">{warning.reason}</p>
-                    </div>
-                    <Badge tone={warning.level}>{warning.score}</Badge>
-                  </div>
-                </div>
-              </article>
-            );
-          })}
-        </div>
-        <EarlyWarningCard warning={alerts[0] ?? db.earlyWarnings[0]} showClinicalDetails />
-      </div>
-    </DoctorShell>
-  );
+  const alerts = db.earlyWarnings.filter(w => w.level !== "green").sort((a,b) => b.score - a.score);
+  const [filter, setFilter] = useState("all");
+  const [selectedId, setSelectedId] = useState(alerts[0]?.id || "");
+  const filtered = alerts.filter(w => filter === "all" || (filter === "high" ? w.level === "red" || w.level === "orange" : w.level === "yellow"));
+  const selected = filtered.find(w => w.id === selectedId) || filtered[0];
+  const patient = db.patients.find(p => p.id === selected?.patientId);
+  const color = selected?.level === "red" ? "#d4928a" : selected?.level === "orange" ? "#dfb380" : "#d0bf7d";
+  return <DoctorShell title="การติดตามผู้ป่วย" description="เห็นสัญญาณสำคัญ และเลือกดูแลเคสที่ต้องการความใส่ใจก่อน">
+    <div className="doctor-alert-layout"><div><section className="doctor-panel"><SectionHeading title="สัญญาณที่ควรติดตาม" detail={`${alerts.length} รายการจากข้อมูลสุขภาพที่บันทึก`} /><DoctorTabs value={filter} onChange={setFilter} tabs={[{ value:"all", label:"ทั้งหมด" },{ value:"high", label:"ควรติดตามก่อน" },{ value:"watch", label:"เฝ้าระวัง" }]} label="กรองระดับความเสี่ยง"><DoctorTabContent value={filter} className="doctor-tab-content"><div>{filtered.map((warning,i) => { const p = db.patients.find(person => person.id === warning.patientId); return <button className={`doctor-warning-item${selected?.id === warning.id ? " selected" : ""}`} key={warning.id} aria-pressed={selected?.id === warning.id} onClick={() => setSelectedId(warning.id)}><div className="doctor-warning-item-header"><PatientAvatar name={p?.name || warning.patientId} index={i} /><div><b>{p?.name || warning.patientId}</b><small>{warning.patientId} · {formatThaiDate(warning.createdAt)}</small></div><RiskPill level={warning.level} /></div><p>{warning.reason}</p></button>; })}{!filtered.length && <EmptyState title="ไม่มีสัญญาณในกลุ่มนี้" detail="เลือกกลุ่มอื่นเพื่อดูรายการติดตาม" />}</div></DoctorTabContent></DoctorTabs></section><ApprovalQueue /></div>
+      <aside className="doctor-panel doctor-alert-detail">{selected && patient ? <><SectionHeading title="รายละเอียดการติดตาม" /><div className="doctor-patient-header" style={{ marginBottom:0 }}><PatientAvatar name={patient.name} index={2} /><div><h2 style={{ fontSize:20 }}>{patient.name}</h2><p>{patient.id}</p></div></div><div className="doctor-risk-spot"><div className="doctor-risk-ring" style={{ background:`conic-gradient(${color} ${Math.min(100,Math.max(0,selected.score))}%, #f0f5f8 0)` }}><div style={{ color }}>{selected.score}<small>คะแนนจาก 100</small></div></div><div><RiskPill level={selected.level} /><p>ประเมินจากแนวโน้ม<br />ข้อมูลสุขภาพที่บันทึก</p></div></div><section className="doctor-recommendation"><h3><ClipboardCheck size={17} />แนวทางสำหรับแพทย์</h3><p>{selected.doctorRecommendation}</p></section><section className="doctor-recommendation"><h3><HeartPulse size={17} />สิ่งที่เสนอให้ติดตาม</h3><p>{selected.suggestedAction}</p><Link className="doc-button quiet" href={`/doctor/patients?patient=${patient.id}`}>เปิดข้อมูลผู้ป่วย <ArrowUpRight size={16} /></Link></section><details><summary>ปัจจัยที่ใช้ประเมิน</summary><ul className="list-disc pl-4 text-xs text-slate-500 leading-7">{selected.contributors.map((c,i) => <li key={i}>{c}</li>)}</ul><p className="text-xs text-slate-400 mt-4">คำแนะนำผู้ป่วย · {selected.patientRecommendation}</p></details></> : <EmptyState title="เลือกเคสเพื่อดูรายละเอียด" />}</aside>
+    </div>
+  </DoctorShell>;
 }

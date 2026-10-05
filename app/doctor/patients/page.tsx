@@ -1,176 +1,53 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { FileText, Search, ShieldPlus, Sparkles } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import { AlertCircle, ArrowUpRight, Check, FileText, Loader2, LockKeyhole, ShieldCheck, Sparkles } from "lucide-react";
+import { toast } from "sonner";
 import { DoctorShell } from "@/components/layouts/doctor-shell";
-import { MultiMetricChart, TrendChart } from "@/components/health/charts";
+import { DoctorTabs, DoctorTabContent, EmptyState, hasPatientAccess, PatientAvatar, SearchField, SectionHeading } from "@/components/doctor/ui";
+import { DoctorHealthChart } from "@/components/doctor/health-chart";
 import { useMockStore } from "@/lib/hooks/use-mock-store";
 import { createDoctorRequest, publishCarePlan } from "@/lib/services/mock-store";
 import { askAI } from "@/lib/services/ai/client";
 import { formatThaiDate } from "@/lib/utils";
 
+const tabs = [{ value:"summary", label:"ข้อมูลสำคัญ" },{ value:"monitoring", label:"แนวโน้ม" },{ value:"timeline", label:"บันทึกสุขภาพ" },{ value:"careplan", label:"แผนดูแล" }];
 export default function DoctorPatientsPage() {
   const { db, setDb } = useMockStore();
   const [query, setQuery] = useState("");
-  const [selectedId, setSelectedId] = useState(db.patients[0].id);
-  const doctor = db.doctors[0];
-  const patients = useMemo(
-    () =>
-      db.patients.filter((patient) =>
-        `${patient.id} ${patient.citizenId} ${patient.name}`.toLowerCase().includes(query.toLowerCase())
-      ),
-    [db.patients, query]
-  );
-  const selected = db.patients.find((patient) => patient.id === selectedId) ?? patients[0];
-  const records = db.healthRecords.filter((record) => record.patientId === selected.id);
-  const plan = db.carePlans.find((item) => item.patientId === selected.id)!;
-  const [draft, setDraft] = useState(plan.summary);
+  const [selectedId, setSelectedId] = useState(db.patients[0]?.id || "");
+  const [tab, setTab] = useState("summary");
+  const [draft, setDraft] = useState(db.carePlans.find(p => p.patientId === selectedId)?.summary || "");
   const [rewriting, setRewriting] = useState(false);
-  const consent = db.consents.find((item) => item.patientId === selected.id && item.doctorId === doctor.id);
-  const approved = consent?.status === "approved" || selected.id === "P-0002";
-
-  async function rewriteCarePlan() {
+  useEffect(() => { const id = new URLSearchParams(window.location.search).get("patient"); if (id && db.patients.some(p => p.id === id)) { setSelectedId(id); setDraft(db.carePlans.find(p => p.patientId === id)?.summary || ""); } }, []); // Read the initial deep link without coupling selection to navigation.
+  const selected = db.patients.find(p => p.id === selectedId);
+  const patients = db.patients.filter(p => `${p.id} ${p.citizenId} ${p.name}`.toLowerCase().includes(query.toLowerCase()));
+  const records = db.healthRecords.filter(r => r.patientId === selectedId).sort((a,b) => a.date.localeCompare(b.date));
+  const latest = records.at(-1);
+  const plan = db.carePlans.find(p => p.patientId === selectedId);
+  const approved = hasPatientAccess(db, selectedId);
+  const consent = db.consents.find(c => c.patientId === selectedId && c.doctorId === db.doctors[0]?.id);
+  function choose(id: string) { setSelectedId(id); setDraft(db.carePlans.find(p => p.patientId === id)?.summary || ""); setTab("summary"); }
+  async function rewrite() {
+    if (!selected || !approved || !plan) return;
     setRewriting(true);
     try {
-      const answer = await askAI(
-        [
-          "ตอบเป็นภาษาไทยในรูปแบบแผนดูแลที่บ้านสำหรับแพทย์ แบ่งหัวข้อ Medication, Diet, Exercise, Measurement Schedule, Follow-up, Lifestyle Advice",
-          `ผู้ป่วย: ${selected.name}`,
-          `Diagnosis: ${selected.diagnosis.join(", ")}`,
-          `Medication: ${selected.medications.join(", ")}`,
-          `ข้อมูลล่าสุด: BP ${records[records.length - 1]?.systolic}/${records[records.length - 1]?.diastolic}, Blood Sugar ${records[records.length - 1]?.bloodSugar}, Sleep ${records[records.length - 1]?.sleepHours}, Exercise ${records[records.length - 1]?.exerciseMinutes} นาที`,
-          `ร่างเดิม: ${draft}`
-        ].join("\n")
-      );
+      const answer = await askAI(["ตอบเป็นภาษาไทยในรูปแบบแผนดูแลที่บ้านสำหรับแพทย์ แบ่งหัวข้อยา อาหาร การออกกำลัง การวัดค่า การติดตาม และการใช้ชีวิต", `ผู้ป่วย: ${selected.name}`, `Diagnosis: ${selected.diagnosis.join(", ")}`, `Medication: ${selected.medications.join(", ")}`, `ข้อมูลล่าสุด: ${latest ? `BP ${latest.systolic}/${latest.diastolic}, Blood Sugar ${latest.bloodSugar}, Sleep ${latest.sleepHours}, Exercise ${latest.exerciseMinutes} นาที` : "ยังไม่มีบันทึก"}`, `ร่างเดิม: ${draft}`].join("\n"), undefined, { patientId: selected.id });
+      if (!answer.trim()) throw new Error("ยังไม่ได้รับคำแนะนำ กรุณาลองอีกครั้ง");
       setDraft(answer);
-    } catch (error) {
-      setDraft(error instanceof Error ? `เรียกใช้งาน AI ไม่สำเร็จ: ${error.message}` : "เรียกใช้งาน AI ไม่สำเร็จ");
-    } finally {
-      setRewriting(false);
-    }
+    } catch (error) { toast.error(error instanceof Error ? error.message : "ยังปรับแผนไม่ได้ กรุณาลองอีกครั้ง"); }
+    finally { setRewriting(false); }
   }
-
-  return (
-    <DoctorShell title="Patients">
-      <div className="grid gap-6 xl:grid-cols-[0.85fr_1.6fr]">
-        <Card>
-          <CardHeader><CardTitle className="flex items-center gap-2"><Search className="h-5 w-5 text-sky-600" /> Patient Search</CardTitle></CardHeader>
-          <CardContent className="space-y-4">
-            <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="ค้นหา Patient ID, Citizen ID หรือชื่อ" />
-            <div className="max-h-[620px] space-y-3 overflow-y-auto pr-1 thin-scrollbar">
-              {patients.map((patient) => {
-                const patientConsent = db.consents.find((item) => item.patientId === patient.id && item.doctorId === doctor.id);
-                const isPatientApproved = patientConsent?.status === "approved" || patient.id === "P-0002";
-                return (
-                  <button
-                    key={patient.id}
-                    onClick={() => {
-                      setSelectedId(patient.id);
-                      const nextPlan = db.carePlans.find((item) => item.patientId === patient.id);
-                      setDraft(nextPlan?.summary ?? "");
-                    }}
-                    className="w-full rounded-2xl border bg-white p-4 text-left shadow-card transition hover:border-sky-200"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="font-bold">{patient.name}</p>
-                        <p className="text-sm text-slate-500">{patient.id} · {patient.citizenId}</p>
-                      </div>
-                      <Badge tone={isPatientApproved ? "green" : patientConsent?.status === "rejected" ? "red" : "yellow"}>
-                        {isPatientApproved ? "Approved" : patientConsent?.status === "rejected" ? "Rejected" : patientConsent ? "Waiting" : "No Request"}
-                      </Badge>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-
-        <div className="space-y-6">
-          <Card>
-            <CardHeader className="flex-row items-start justify-between gap-4">
-              <div>
-                <CardTitle>{selected.name}</CardTitle>
-                <p className="mt-1 text-sm text-slate-500">{selected.hospital} · {selected.diagnosis.join(" · ")}</p>
-              </div>
-              {approved ? (
-                <Badge tone="green">Approved</Badge>
-              ) : (
-                <Button onClick={() => setDb((current) => createDoctorRequest(current, selected.id, doctor.id))}>
-                  <ShieldPlus className="h-4 w-4" />
-                  Request Access
-                </Button>
-              )}
-            </CardHeader>
-            <CardContent>
-              {!approved ? (
-                <div className="rounded-2xl bg-amber-50 p-5 text-amber-800">
-                  แพทย์ยังดูเวชระเบียนไม่ได้จนกว่าผู้ป่วยจะอนุมัติคำขอเข้าถึงข้อมูล
-                </div>
-              ) : (
-                <Tabs defaultValue="summary">
-                  <TabsList>
-                    <TabsTrigger value="summary">Summary</TabsTrigger>
-                    <TabsTrigger value="monitoring">Home Monitoring</TabsTrigger>
-                    <TabsTrigger value="timeline">Timeline</TabsTrigger>
-                    <TabsTrigger value="careplan">AI Care Plan</TabsTrigger>
-                  </TabsList>
-                  <TabsContent value="summary" className="grid gap-4 lg:grid-cols-2">
-                    {[
-                      ["Personal Information", `${selected.gender} · อายุ ${selected.age} · Citizen ID ${selected.citizenId}`],
-                      ["Diagnosis", selected.diagnosis.join(", ")],
-                      ["Allergy", selected.allergies.join(", ")],
-                      ["Medication", selected.medications.join(", ")],
-                      ["Laboratory", "HbA1c 7.4%, eGFR 72, LDL 108"],
-                      ["Caregiver Confirmation Status", `${records.filter((item) => item.confirmationStatus === "pending").length} pending`]
-                    ].map(([title, text]) => (
-                      <div key={title} className="rounded-2xl bg-sky-50 p-4">
-                        <p className="font-bold">{title}</p>
-                        <p className="mt-1 text-sm leading-6 text-slate-600">{text}</p>
-                      </div>
-                    ))}
-                  </TabsContent>
-                  <TabsContent value="monitoring" className="space-y-4">
-                    <MultiMetricChart records={records} />
-                  </TabsContent>
-                  <TabsContent value="timeline" className="space-y-3">
-                    {records.slice(-8).reverse().map((record) => (
-                      <div key={record.id} className="flex items-center justify-between rounded-2xl border bg-white p-4">
-                        <div>
-                          <p className="font-bold">{formatThaiDate(record.date)}</p>
-                          <p className="text-sm text-slate-500">BP {record.systolic}/{record.diastolic} · BS {record.bloodSugar} · Sleep {record.sleepHours}</p>
-                        </div>
-                        <Badge tone={record.confirmationStatus === "confirmed" ? "green" : "yellow"}>{record.confirmationStatus}</Badge>
-                      </div>
-                    ))}
-                  </TabsContent>
-                  <TabsContent value="careplan" className="space-y-4">
-                    <div className="rounded-2xl bg-sky-50 p-4">
-                      <p className="flex items-center gap-2 font-bold"><Sparkles className="h-5 w-5 text-sky-600" /> AI automatically generated draft</p>
-                      <p className="mt-1 text-sm text-slate-500">Medication, Diet, Exercise, Measurement Schedule, Follow-up และ Lifestyle Advice</p>
-                    </div>
-                    <Textarea value={draft} onChange={(event) => setDraft(event.target.value)} />
-                    <div className="grid gap-3 lg:grid-cols-3">
-                      <Button variant="outline" disabled={rewriting} onClick={rewriteCarePlan}>
-                        {rewriting ? "กำลังประมวลผล..." : "ให้ AI ปรับปรุงแผน"}
-                      </Button>
-                      <Button variant="destructive" onClick={() => setDraft("")}>Delete</Button>
-                      <Button onClick={() => setDb((current) => publishCarePlan(current, { ...plan, summary: draft }))}><FileText className="h-4 w-4" /> Approve & Publish</Button>
-                    </div>
-                  </TabsContent>
-                </Tabs>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    </DoctorShell>
-  );
+  return <DoctorShell title="ผู้ป่วยของคุณ" description="เลือกผู้ป่วย เพื่อดูข้อมูลและติดตามการดูแลได้ในที่เดียว">
+    <div className="doctor-master-detail"><aside className="doctor-directory"><SectionHeading title="รายชื่อผู้ป่วย"><span className="doctor-directory-count">{patients.length} ราย</span></SectionHeading><SearchField value={query} onChange={setQuery} placeholder="ค้นหาชื่อ รหัส หรือเลขบัตร" /><div className="doctor-directory-list">{patients.map((p,i) => <button key={p.id} className={`doctor-directory-item${p.id === selectedId ? " selected" : ""}`} aria-pressed={p.id === selectedId} onClick={() => choose(p.id)} disabled={rewriting}><PatientAvatar name={p.name} index={i} /><div><b>{p.name}</b><small>{p.id} · {p.age} ปี</small></div><span className={`access-dot${hasPatientAccess(db,p.id) ? "" : " locked"}`} title={hasPatientAccess(db,p.id) ? "เข้าถึงข้อมูลได้" : "ยังไม่ได้รับอนุญาต"} /></button>)}{!patients.length && <EmptyState title="ไม่พบผู้ป่วย" detail="ลองค้นหาด้วยชื่อหรือรหัสอื่น" />}</div></aside>
+    {selected ? <section className="doctor-panel doctor-patient-detail"><div className="doctor-patient-header"><PatientAvatar name={selected.name} large /><div><h2>{selected.name}</h2><p>{selected.id} · {selected.age} ปี · {selected.gender}</p></div><span className={`doctor-status status-${approved ? "green" : "yellow"}`}>{approved ? <ShieldCheck size={12} /> : <LockKeyhole size={12} />}{approved ? "เข้าถึงข้อมูลได้" : consent?.status === "waiting" ? "รออนุญาต" : "ยังไม่ได้รับอนุญาต"}</span></div>
+      {!approved ? <EmptyState title={consent?.status === "waiting" ? "รอผู้ป่วยอนุญาตให้เข้าถึงข้อมูล" : "ขอสิทธิ์เข้าถึงข้อมูลสุขภาพ"} detail="ผู้ป่วยเป็นผู้อนุญาตให้แพทย์ดูข้อมูล เพื่อวางแผนดูแลร่วมกัน">{consent?.status !== "waiting" && <button className="doc-button" onClick={() => { if (!db.doctors[0]) return; setDb(current => createDoctorRequest(current,selected.id,db.doctors[0].id)); toast.success("ส่งคำขอให้ผู้ป่วยแล้ว"); }}><LockKeyhole size={15} />ส่งคำขอเข้าถึง</button>}</EmptyState> : <DoctorTabs value={tab} onChange={setTab} tabs={tabs} label="ข้อมูลผู้ป่วย">
+      <DoctorTabContent value="summary" className="doctor-tab-content"><div className="doctor-last-record"><span>ค่าล่าสุด {latest ? `· ${formatThaiDate(latest.date)}` : "· ยังไม่มีบันทึก"}</span><span>{records.length} บันทึก</span></div><div className="doctor-metric-strip"><div><span>ความดันโลหิต</span><b>{latest ? `${latest.systolic}/${latest.diastolic}` : "—"}<small>mmHg</small></b></div><div><span>น้ำตาลในเลือด</span><b>{latest?.bloodSugar ?? "—"}<small>mg/dL</small></b></div><div><span>ชีพจร</span><b>{latest?.heartRate ?? "—"}<small>ครั้ง/นาที</small></b></div></div><dl><div className="doctor-info-row"><dt>โรคประจำตัว</dt><dd>{selected.diagnosis.join(" · ") || "ไม่มีข้อมูล"}</dd></div><div className="doctor-info-row"><dt>ประวัติการแพ้</dt><dd className={selected.allergies.length ? "doctor-allergy" : ""}>{selected.allergies.length > 0 && <AlertCircle size={16} className="mt-1 shrink-0" />}{selected.allergies.join(" · ") || "ไม่มีประวัติแพ้ยา"}</dd></div><div className="doctor-info-row"><dt>ยาที่ใช้ประจำ</dt><dd>{selected.medications.join(" · ") || "ไม่มีข้อมูล"}</dd></div><div className="doctor-info-row"><dt>สถานพยาบาล</dt><dd>{selected.hospital}</dd></div><div className="doctor-info-row"><dt>ผู้ดูแล</dt><dd>{db.caregivers.find(c => c.id === selected.caregiverId)?.name || "ยังไม่มีข้อมูล"}<span className="block text-xs text-slate-400 mt-1">{records.filter(r => r.confirmationStatus === "pending").length} บันทึกรอผู้ดูแลยืนยัน</span></dd></div></dl><details className="mt-3"><summary>ข้อมูลส่วนบุคคลเพิ่มเติม</summary><dl><div className="doctor-info-row"><dt>เลขบัตรประชาชน</dt><dd>{selected.citizenId}</dd></div><div className="doctor-info-row"><dt>ติดต่อ</dt><dd>{selected.phone || selected.email || "ไม่มีข้อมูล"}</dd></div><div className="doctor-info-row"><dt>น้ำหนัก / ส่วนสูง</dt><dd>{latest?.weight ?? selected.weight ?? "—"} กก. / {latest?.height ?? selected.height ?? "—"} ซม.</dd></div></dl></details></DoctorTabContent>
+      <DoctorTabContent value="monitoring" className="doctor-tab-content"><DoctorHealthChart records={records} /></DoctorTabContent>
+      <DoctorTabContent value="timeline" className="doctor-tab-content"><SectionHeading title="บันทึกจากที่บ้าน" detail="รายการล่าสุด พร้อมสถานะการยืนยัน" /><div className="doctor-table-wrap"><table className="doctor-table"><thead><tr><th>วันที่</th><th>ความดัน</th><th>น้ำตาล</th><th>นอนหลับ</th><th>สถานะ</th></tr></thead><tbody>{records.slice(-14).reverse().map(r => <tr key={r.id}><td>{formatThaiDate(r.date)}</td><td>{r.systolic}/{r.diastolic}</td><td>{r.bloodSugar} mg/dL</td><td>{r.sleepHours} ชม.</td><td><span className={`doctor-status status-${r.confirmationStatus === "confirmed" ? "green" : r.confirmationStatus === "rejected" ? "red" : "yellow"}`}>{r.confirmationStatus === "confirmed" ? "ยืนยันแล้ว" : r.confirmationStatus === "rejected" ? "ปฏิเสธ" : "รอยืนยัน"}</span></td></tr>)}</tbody></table></div>{!records.length && <EmptyState title="ยังไม่มีบันทึกสุขภาพ" />}</DoctorTabContent>
+      <DoctorTabContent value="careplan" className="doctor-tab-content">{plan ? <><SectionHeading title="สรุปแผนดูแล" detail="ปรับข้อความ แล้วตรวจสอบก่อนส่งต่อ"><Link className="doctor-text-link" href={`/doctor/care-plans?patient=${selected.id}`}>แผนฉบับเต็ม <ArrowUpRight size={15} /></Link></SectionHeading><label className="doctor-field"><span>คำแนะนำสำหรับผู้ป่วย</span><textarea rows={8} value={draft} onChange={e => setDraft(e.target.value)} disabled={rewriting} /></label><div className="doctor-form-actions"><button className="doc-button secondary" disabled={rewriting} onClick={rewrite}>{rewriting ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />}ให้ผู้ช่วยปรับแผน</button><button className="doc-button" disabled={rewriting || !draft.trim()} onClick={() => { setDb(current => publishCarePlan(current,{ ...plan, summary:draft })); }}><Check size={15} />อนุมัติและส่งแผน</button></div></> : <EmptyState title="ยังไม่มีแผนดูแล"><Link className="doc-button" href="/doctor/care-plans"><FileText size={15} />เขียนแผนดูแล</Link></EmptyState>}</DoctorTabContent>
+      </DoctorTabs>}
+    </section> : <section className="doctor-panel"><EmptyState title="ยังไม่มีผู้ป่วย" /></section>}</div>
+  </DoctorShell>;
 }
