@@ -6,7 +6,7 @@ import { AlertCircle, ArrowUpRight, Check, FileText, Loader2, LockKeyhole, Shiel
 import { toast } from "sonner";
 import { DoctorShell } from "@/components/layouts/doctor-shell";
 import { DoctorTabs, DoctorTabContent, EmptyState, hasPatientAccess, PatientAvatar, SearchField, SectionHeading } from "@/components/doctor/ui";
-import { DoctorHealthChart } from "@/components/doctor/health-chart";
+import { DoctorHealthChart } from "@/components/health/lazy-charts";
 import { useMockStore } from "@/lib/hooks/use-mock-store";
 import { createDoctorRequest, publishCarePlan } from "@/lib/services/mock-store";
 import { askAI } from "@/lib/services/ai/client";

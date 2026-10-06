@@ -9,12 +9,14 @@ const riskStyle = {
   red: { label: "เสี่ยงสูง", text: "text-rose-700", background: "bg-rose-50", stroke: "stroke-rose-500" }
 };
 
-export function EarlyWarningCard({ warning, showClinicalDetails = false }: { warning: EarlyWarning; showClinicalDetails?: boolean }) {
+export function EarlyWarningCard({ warning, showClinicalDetails = false, metricAlerts = [] }: { warning: EarlyWarning; showClinicalDetails?: boolean; metricAlerts?: string[] }) {
   const style = riskStyle[warning.level];
   const Icon = warning.level === "green" ? ShieldCheck : AlertTriangle;
   const score = Math.max(0, Math.min(100, warning.score));
   if (warning.level === "green" && !showClinicalDetails) {
-    return <section className="rounded-[24px] bg-[#e7f3eb] px-4 py-2"><details className="group"><summary className="flex min-h-12 items-center gap-2 text-sm"><ShieldCheck className="h-5 w-5 text-emerald-600"/><span className="flex-1 font-medium text-emerald-900">สัญญาณสุขภาพ</span><span className="text-xs text-emerald-700">ปกติ</span><ChevronDown className="h-4 w-4 text-emerald-600 group-open:rotate-180"/></summary><div className="space-y-3 pb-3 pt-2 text-sm leading-7 text-slate-600"><p>{warning.reason}</p><p>{warning.patientRecommendation}</p><p className="text-xs">ความเสี่ยง {score}/100 · คะแนนสูง = ความเสี่ยงเพิ่มขึ้น</p><p className="text-xs">{formatThaiDate(warning.createdAt)} · {warning.suggestedAction}</p></div></details></section>;
+    const attention = metricAlerts.length > 0;
+    const SummaryIcon = attention ? AlertTriangle : ShieldCheck;
+    return <section className={cn("rounded-[24px] px-4 py-2", attention ? "bg-[#fff1db]" : "bg-[#e7f3eb]")}><details className="group"><summary className="flex min-h-12 items-center gap-2 text-sm"><SummaryIcon className={cn("h-5 w-5 shrink-0", attention ? "text-amber-700" : "text-emerald-600")}/><span className="flex-1 font-medium text-slate-800">สัญญาณสุขภาพ</span><span className={cn("text-xs", attention ? "text-amber-800" : "text-emerald-700")}>{attention ? "มีค่าควรใส่ใจ" : "ความเสี่ยงต่ำ"}</span><ChevronDown className="h-4 w-4 shrink-0 text-slate-500 group-open:rotate-180"/></summary><div className="space-y-3 pb-3 pt-2 text-sm leading-7 text-slate-600"><p>{attention ? metricAlerts.join(" · ") : warning.reason}</p><p>{warning.patientRecommendation}</p><p className="text-xs">ความเสี่ยงรวม {score}/100 · คะแนนสูง = ความเสี่ยงเพิ่มขึ้น</p><p className="text-xs">ประเมิน {formatThaiDate(warning.createdAt)} · {warning.suggestedAction}</p></div></details></section>;
   }
   return (
     <section className="care-sheet p-5 sm:p-6">

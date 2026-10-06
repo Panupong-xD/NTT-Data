@@ -103,7 +103,7 @@ export function MockChat({
           agentAction: generatedAction
         }
       ]);
-    } catch (error) {
+    } catch {
       setMessages((current) => [
         ...current,
         {

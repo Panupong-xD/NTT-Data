@@ -1,7 +1,9 @@
 "use client";
 
 import { toast } from "sonner";
-import { createMockDatabase, evaluateEarlyWarning, mockDb } from "@/lib/data/mock-db";
+import { createMockDatabase, mockDb } from "@/lib/data/mock-db";
+import { syncAppointments } from "@/lib/appointments";
+import { syncHealthSummaries } from "@/lib/health-summary";
 import {
   CarePlan,
   CareTaskStatus,
@@ -16,7 +18,7 @@ const STORAGE_KEY = "wellync-mock-db";
 const LEGACY_STORAGE_KEY = "true-innovation-mock-db";
 
 export function loadMockStore(): MockDatabase {
-  if (typeof window === "undefined") return mockDb;
+  if (typeof window === "undefined") return syncHealthSummaries(syncAppointments(mockDb));
   let raw = localStorage.getItem(STORAGE_KEY);
   if (!raw) {
     const legacy = localStorage.getItem(LEGACY_STORAGE_KEY);
@@ -26,7 +28,7 @@ export function loadMockStore(): MockDatabase {
       localStorage.removeItem(LEGACY_STORAGE_KEY);
     } else {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(mockDb));
-      return mockDb;
+      return syncHealthSummaries(syncAppointments(mockDb));
     }
   }
   try {
@@ -38,19 +40,20 @@ export function loadMockStore(): MockDatabase {
       parsed.notifications.some(n => n.id === "N-2");
     if (needsReset) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(mockDb));
-      return mockDb;
+      return syncHealthSummaries(syncAppointments(mockDb));
     }
-    return {
+    return syncHealthSummaries(syncAppointments({
       ...parsed,
       carePlans: parsed.carePlans.map(plan => ({
         ...plan,
+        followUp: plan.followUp.map(item => item === "พบแพทย์ตามนัดใน 14 วัน" ? "พบแพทย์ตามวันนัดในปฏิทิน" : item),
         appointments: plan.appointments ?? mockDb.carePlans.find(seed => seed.id === plan.id)?.appointments
       }))
-    };
+    }));
   } catch {
     const fresh = createMockDatabase();
     localStorage.setItem(STORAGE_KEY, JSON.stringify(fresh));
-    return fresh;
+    return syncHealthSummaries(syncAppointments(fresh));
   }
 }
 
@@ -64,14 +67,8 @@ export function addHealthRecord(db: MockDatabase, record: Omit<HealthRecord, "id
     id: `${record.patientId}-R-${Date.now()}`
   };
   const records = [...db.healthRecords, newRecord].sort((a, b) => a.date.localeCompare(b.date));
-  const patientRecords = records.filter((item) => item.patientId === record.patientId);
-  const warning = evaluateEarlyWarning(patientRecords, record.patientId);
   toast.success("บันทึกข้อมูลสุขภาพแล้ว");
-  return {
-    ...db,
-    healthRecords: records,
-    earlyWarnings: db.earlyWarnings.map((item) => (item.patientId === record.patientId ? warning : item))
-  };
+  return syncHealthSummaries({ ...db, healthRecords: records });
 }
 
 export function updateRecordStatus(db: MockDatabase, recordId: string, status: HealthRecord["confirmationStatus"]) {
@@ -89,20 +86,6 @@ export function deleteHealthRecord(db: MockDatabase, recordId: string) {
   return {
     ...db,
     healthRecords: db.healthRecords.filter((record) => record.id !== recordId)
-  };
-}
-
-export function updateTaskStatus(db: MockDatabase, planId: string, taskId: string, status: CareTaskStatus) {
-  return {
-    ...db,
-    carePlans: db.carePlans.map((plan) =>
-      plan.id === planId
-        ? {
-            ...plan,
-            tasks: plan.tasks.map((task) => (task.id === taskId ? { ...task, status } : task))
-          }
-        : plan
-    )
   };
 }
 

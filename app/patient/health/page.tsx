@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { HealthLiquidTabs } from "@/components/mobile/liquid-tabs";
 import { MobileShell } from "@/components/layouts/mobile-shell";
-import { MobileHealthChart } from "@/components/mobile/health-chart";
+import { MobileHealthChart } from "@/components/health/lazy-charts";
 import { HealthCharm } from "@/components/mobile/health-charm";
 import { MockChat } from "@/components/chat/mock-chat";
 import { useMockStore } from "@/lib/hooks/use-mock-store";
@@ -17,6 +17,7 @@ import { askAI } from "@/lib/services/ai/client";
 import { formatThaiDate } from "@/lib/utils";
 import { MarkdownRenderer } from "@/components/ui/markdown-renderer";
 import { useAuth } from "@/lib/hooks/use-auth";
+import { GlucoseTiming, glucoseStatus, glucoseTimingLabels } from "@/lib/health-status";
 
 function compressAndResizeImage(file: File, maxWidth = 800, maxHeight = 800, quality = 0.7): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -104,6 +105,7 @@ export default function PatientHealthPage() {
   const [foodNameInput, setFoodNameInput] = useState("");
   const [foodFilesPayload, setFoodFilesPayload] = useState<Array<{ type: string; name: string; data: string }>>([]);
 
+  const [bloodSugarTiming, setBloodSugarTiming] = useState<GlucoseTiming>("unknown");
   const [form, setForm] = useState({
     systolic: String(latest.systolic),
     diastolic: String(latest.diastolic),
@@ -176,13 +178,11 @@ export default function PatientHealthPage() {
 
   const [deviceScanning, setDeviceScanning] = useState(false);
   const [deviceImagePreview, setDeviceImagePreview] = useState("");
-  const [deviceNameLog, setDeviceNameLog] = useState("");
   const [isVitalsCameraOpen, setIsVitalsCameraOpen] = useState(false);
   const [isFoodCameraOpen, setIsFoodCameraOpen] = useState(false);
 
   async function handleDeviceCameraCapture(base64Data: string) {
     setDeviceScanning(true);
-    setDeviceNameLog("camera_capture.jpg");
     setDeviceImagePreview(base64Data);
 
     try {
@@ -350,7 +350,6 @@ export default function PatientHealthPage() {
     if (!file) return;
 
     setDeviceScanning(true);
-    setDeviceNameLog(file.name);
     setDeviceImagePreview(URL.createObjectURL(file));
 
     try {
@@ -465,6 +464,7 @@ export default function PatientHealthPage() {
         systolic: Number(form.systolic),
         diastolic: Number(form.diastolic),
         bloodSugar: Number(form.bloodSugar),
+        bloodSugarTiming,
         heartRate: Number(form.heartRate),
         weight: Number(form.weight),
         height: Number(form.height),
@@ -572,10 +572,11 @@ export default function PatientHealthPage() {
               <label className="flex min-h-[70px] cursor-pointer items-center justify-center gap-2 rounded-[20px] bg-[#efebfa] text-sm font-medium text-violet-700"><Upload className="h-5 w-5"/>เลือกรูป<input type="file" className="sr-only" aria-label="เลือกรูปเครื่องวัด" accept="image/*" onChange={handleDeviceScan}/></label>
             </div>
             {deviceScanning&&<p role="status" className="mb-4 flex items-center gap-2 text-sm text-sky-700"><Loader2 className="h-4 w-4 animate-spin"/>กำลังอ่านค่าจากรูป…</p>}
-            {deviceImagePreview&&<div className="mb-4 flex items-center gap-3"><img src={deviceImagePreview} alt="รูปเครื่องวัดที่เลือก" className="h-12 w-12 rounded-xl object-cover"/><p className="flex-1 text-xs text-slate-500">ตรวจสอบตัวเลขก่อนบันทึก</p><Button size="sm" variant="ghost" onClick={()=>{setDeviceImagePreview("");setDeviceNameLog("");}}>ลบรูป</Button></div>}
+            {deviceImagePreview&&<div className="mb-4 flex items-center gap-3"><img src={deviceImagePreview} alt="รูปเครื่องวัดที่เลือก" className="h-12 w-12 rounded-xl object-cover"/><p className="flex-1 text-xs text-slate-500">ตรวจสอบตัวเลขก่อนบันทึก</p><Button size="sm" variant="ghost" onClick={()=>{setDeviceImagePreview("");}}>ลบรูป</Button></div>}
             <div className="grid grid-cols-2 gap-3">
               {[["systolic","ความดันตัวบน","mmHg"],["diastolic","ความดันตัวล่าง","mmHg"],["bloodSugar","น้ำตาล","mg/dL"],["weight","น้ำหนัก","กก."]].map(([key,label,unit])=><div key={key}><label htmlFor={`vital-${key}`} className="mobile-form-label">{label}<span className="ml-1 text-[10px] text-slate-400">{unit}</span></label><Input id={`vital-${key}`} type="number" min="0" step="any" value={form[key as keyof typeof form]} onChange={e=>setForm(current=>({...current,[key]:e.target.value}))} inputMode="decimal"/></div>)}
             </div>
+            <div className="mt-4"><label htmlFor="blood-sugar-timing" className="mobile-form-label">วัดน้ำตาลช่วงไหน?</label><select id="blood-sugar-timing" value={bloodSugarTiming} onChange={e => setBloodSugarTiming(e.target.value as GlucoseTiming)} className="min-h-11 w-full rounded-2xl border border-slate-200 bg-white px-3 text-sm text-slate-700"><option value="unknown">เลือกช่วงที่วัด</option><option value="before-meal">ก่อนอาหาร</option><option value="after-meal">หลังเริ่มอาหาร 1–2 ชั่วโมง</option></select>{bloodSugarTiming !== "unknown" && <p className="mt-2 text-xs text-slate-500">{glucoseStatus(Number(form.bloodSugar), bloodSugarTiming)?.label} · {glucoseTimingLabels[bloodSugarTiming]}</p>}</div>
             <details className="mt-4"><summary className="flex min-h-11 items-center justify-between text-sm text-slate-500">การนอน ชีพจร และส่วนสูง<span className="text-sky-600">+</span></summary><div className="grid grid-cols-2 gap-3 pt-2">{[["sleepHours","เวลานอน (ชม.)"],["heartRate","ชีพจร (ครั้ง/นาที)"],["height","ส่วนสูง (ซม.)"]].map(([key,label])=><div key={key}><label className="mobile-form-label" htmlFor={`vital-${key}`}>{label}</label><Input id={`vital-${key}`} type="number" min="0" step="any" value={form[key as keyof typeof form]} onChange={e=>setForm(current=>({...current,[key]:e.target.value}))} inputMode="decimal"/></div>)}</div></details>
             <Button className="mt-5 h-12 w-full rounded-full" onClick={submitRecord}><CheckCircle2 className="h-4 w-4"/>บันทึกสุขภาพ</Button><p className="mt-2 text-center text-[11px] text-slate-500">ส่งให้ผู้ดูแลช่วยยืนยัน</p>
           </section>

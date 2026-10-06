@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { HeartPulse } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
 
 export function AuthCard({
   title,

@@ -14,13 +14,6 @@ export function formatThaiDate(date: string | Date, options?: Intl.DateTimeForma
   }).format(typeof date === "string" ? new Date(date) : date);
 }
 
-export function thaiTime(date: string | Date) {
-  return new Intl.DateTimeFormat("th-TH", {
-    hour: "2-digit",
-    minute: "2-digit"
-  }).format(typeof date === "string" ? new Date(date) : date);
-}
-
 export function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }

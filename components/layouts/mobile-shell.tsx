@@ -1,8 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { usePathname } from "next/navigation";
 import { motion, useReducedMotion } from "framer-motion";
 import { ArrowLeft, Bell, HeartPulse, Home, ListChecks, UserRound, UsersRound } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -11,6 +9,7 @@ import { UserRole } from "@/lib/types";
 import { useMockStore } from "@/lib/hooks/use-mock-store";
 import { useAuth } from "@/lib/hooks/use-auth";
 import { LiquidIndicator } from "@/components/mobile/liquid-indicator";
+import { useAppNavigation } from "@/lib/hooks/use-app-navigation";
 
 const navConfig = {
   patient: [
@@ -52,12 +51,11 @@ export function MobileAppLayout({
   role: Extract<UserRole, "patient" | "caregiver">;
   children: React.ReactNode;
 }) {
-  const pathname = usePathname();
   const navItems = navConfig[role];
-  const [navigationTarget, setNavigationTarget] = useState<string | null>(null);
-  useEffect(() => setNavigationTarget(null), [pathname]);
-  const currentPath = pathname.replace(/\/$/, "");
-  const activeIndex = navItems.findIndex(item => item.href === (navigationTarget || currentPath));
+  const navigation = useAppNavigation(navItems);
+  const pathname = navigation.pathname;
+  const currentPath = pathname;
+  const activeIndex = navItems.findIndex(item => item.href === navigation.activePath);
   const title = pageTitles[currentPath.split("/").pop() || ""] || "WELLYNC";
   const { db } = useMockStore();
   const { user } = useAuth();
@@ -114,10 +112,9 @@ export function MobileAppLayout({
           {navItems.map((item, index) => {
             const active = activeIndex === index;
             const Icon = item.icon;
-            return <Link key={item.href} href={item.href} aria-current={currentPath === item.href ? "page" : undefined}
-              onClick={event => {
-                if (!event.defaultPrevented && event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) setNavigationTarget(item.href);
-              }}
+            return <Link key={item.href} href={item.href} prefetch={true} aria-current={currentPath === item.href ? "page" : undefined}
+              onClick={event => navigation.onClick(event, item.href)}
+              onPointerEnter={() => navigation.prefetch(item.href)} onFocus={() => navigation.prefetch(item.href)} onTouchStart={() => navigation.prefetch(item.href)}
               className={cn("relative flex min-h-[62px] flex-col items-center justify-center gap-1 rounded-[24px] text-xs font-medium transition-colors", active ? "text-sky-700" : "text-slate-500")}>
               <Icon className="relative h-[22px] w-[22px]" strokeWidth={active ? 2.3 : 1.7} /><span className="relative">{item.label}</span>
             </Link>;

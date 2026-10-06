@@ -63,34 +63,6 @@ export async function askAI(
 }
 
 /**
- * Get available Amazon Bedrock Models
- */
-export async function getAvailableModels() {
-  const API_BASE_URL = getApiBaseUrl();
-  try {
-    const response = await fetch(`${API_BASE_URL}/api/ai/models`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" }
-    });
-
-    if (response.ok) {
-      return await response.json();
-    }
-  } catch (error) {
-    console.warn("Models fetch fallback:", error);
-  }
-
-  return {
-    provider: "Amazon Bedrock",
-    models: [
-      { id: "amazon.nova-micro-v1:0", name: "Amazon Nova Micro (Cost-Optimized / Default)", tier: "standard" },
-      { id: "anthropic.claude-3-5-haiku-20241022-v1:0", name: "Claude 3.5 Haiku (Fast & Precise)", tier: "standard" },
-      { id: "anthropic.claude-3-5-sonnet-20241022-v2:0", name: "Claude 3.5 Sonnet (Critical Case Reasoning)", tier: "critical" }
-    ]
-  };
-}
-
-/**
  * Fetch Human-in-the-Loop Approvals from DynamoDB via API Gateway
  */
 export async function getApprovals(statusFilter?: "PENDING" | "APPROVED" | "REJECTED" | "ALL"): Promise<ApprovalEntity[]> {

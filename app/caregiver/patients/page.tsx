@@ -5,7 +5,7 @@ import { Check, HeartPulse, Sparkles, ChevronDown, ArrowUpRight } from "lucide-r
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MobileShell } from "@/components/layouts/mobile-shell";
-import { MobileHealthChart } from "@/components/mobile/health-chart";
+import { MobileHealthChart } from "@/components/health/lazy-charts";
 import { ProfileIdentity } from "@/components/health/health-passport";
 import { useMockStore } from "@/lib/hooks/use-mock-store";
 import { updateRecordStatus, confirmTaskStatus } from "@/lib/services/mock-store";

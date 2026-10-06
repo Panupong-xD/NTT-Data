@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/hooks/use-auth";
 import { useMockStore } from "@/lib/hooks/use-mock-store";
 import { CareTask } from "@/lib/types";
@@ -15,7 +15,11 @@ export function MobileCarePlanPage({ role }: {role:"patient"|"caregiver"}) {
   const caregiver=db.caregivers.find(c=>c.email===user?.email)||db.caregivers[0];
   const patient=(role==="patient"?db.patients.find(p=>p.email===user?.email):db.patients.find(p=>p.id===caregiver.patientId))||db.patients[0];
   const plan=db.carePlans.find(p=>p.patientId===patient.id);
-  const [today]=useState(bangkokDate); const [date,setDate]=useState(today);const [task,setTask]=useState<CareTask|null>(null);
+  const today=bangkokDate(); const [date,setDate]=useState(today);const [task,setTask]=useState<CareTask|null>(null);
+  useEffect(() => {
+    const requested = new URLSearchParams(window.location.search).get("date");
+    if (requested && plan?.appointments?.some(item => item.date === requested)) setDate(requested);
+  }, [plan?.appointments]);
   const tasks=date===today ? plan?.tasks||[] : date>today ? (plan?.tasks||[]).map(t=>({...t,status:"pending" as const,pendingConfirm:undefined})) : [];
   return <MobileShell role={role} title="แผนดูแล">
     <CareCalendar today={today} date={date} onDateChange={setDate} appointments={plan?.appointments} />

@@ -42,6 +42,11 @@ export function CareCalendar({ today, date, onDateChange, appointments = [] }: {
   const transition = { duration: reduceMotion ? 0 : morphDuration, ease: [0.32, 0, 0.2, 1] as const };
 
   useEffect(() => {
+    setMonth(date.slice(0, 7));
+    setWeekStart(current => date >= current && date <= addCalendarDays(current, 6) ? current : addCalendarDays(date, -2));
+  }, [date]);
+
+  useEffect(() => {
     const target = expanded ? 88 + cells.length / 7 * 48 : 82;
     const targetOpenness = expanded ? 1 : 0;
     if (reduceMotion || (height.get() === target && openness.get() === targetOpenness)) {

@@ -4,7 +4,7 @@ import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { AppUser, UserRole } from "@/lib/types";
-import { getRoleFromEmail, loginWithEmail, logoutUser, readMockUser, registerWithEmail, resetPassword } from "@/lib/services/auth";
+import { getRoleFromEmail, loginWithEmail, logoutUser, readMockUser, resetPassword } from "@/lib/services/auth";
 import { useMockStore } from "@/lib/hooks/use-mock-store";
 
 interface AuthContextValue {
@@ -108,7 +108,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             doctorId: "demo-doctor",
             caregiverId: "demo-caregiver",
             hospital: "โรงพยาบาลนวัตกรรมสุขภาพ",
-            healthScore: 85,
+            healthScore: null,
             email,
             dob: extra?.dob || "",
             weight: Number(extra?.weight || 70),

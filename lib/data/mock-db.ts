@@ -4,14 +4,15 @@ import {
   Caregiver,
   ConsentRequest,
   Doctor,
-  EarlyWarning,
   HealthRecord,
   MockDatabase,
   NotificationItem,
-  Patient,
-  RiskLevel
+  Patient
 } from "@/lib/types";
 import { clamp } from "@/lib/utils";
+import { addCalendarDays, bangkokDate } from "@/lib/mobile-calendar";
+import { prototypeAppointmentOffset } from "@/lib/appointments";
+import { evaluateEarlyWarning, syncHealthSummaries } from "@/lib/health-summary";
 
 const today = new Date("2026-07-11T08:00:00+07:00");
 
@@ -19,76 +20,6 @@ function isoDaysAgo(days: number) {
   const date = new Date(today);
   date.setDate(today.getDate() - days);
   return date.toISOString();
-}
-
-function riskTone(score: number): RiskLevel {
-  if (score >= 76) return "red";
-  if (score >= 58) return "orange";
-  if (score >= 38) return "yellow";
-  return "green";
-}
-
-export function evaluateEarlyWarning(records: HealthRecord[], patientId: string): EarlyWarning {
-  const latest = records[records.length - 1];
-  const last3 = records.slice(-3);
-  const last7 = records.slice(-7);
-  const bpTrend = last3[last3.length - 1].systolic - last3[0].systolic;
-  const weightTrend = last7[last7.length - 1].weight - last7[0].weight;
-  const skippedMeds = last7.filter((record) => !record.medicationTaken).length;
-  const sleepDrop = last3[0].sleepHours - last3[last3.length - 1].sleepHours;
-  const exerciseAverage = last7.reduce((sum, record) => sum + record.exerciseMinutes, 0) / last7.length;
-  let score = 22;
-  const contributors: string[] = [];
-
-  if (bpTrend >= 8 || latest.systolic >= 145) {
-    score += 22;
-    contributors.push("ความดันเพิ่มต่อเนื่องใน 3 วัน");
-  }
-  if (latest.bloodSugar >= 165) {
-    score += 18;
-    contributors.push("น้ำตาลหลังอาหารสูงกว่าช่วงเป้าหมาย");
-  }
-  if (weightTrend >= 1.2) {
-    score += 14;
-    contributors.push("น้ำหนักเพิ่มต่อเนื่องในสัปดาห์นี้");
-  }
-  if (skippedMeds >= 2) {
-    score += 18;
-    contributors.push("ลืมรับประทานยาหลายครั้ง");
-  }
-  if (sleepDrop >= 1.2 || latest.sleepHours < 5.5) {
-    score += 10;
-    contributors.push("ระยะเวลานอนลดลง");
-  }
-  if (exerciseAverage < 18) {
-    score += 8;
-    contributors.push("กิจกรรมทางกายลดลง");
-  }
-
-  score = clamp(Math.round(score), 0, 100);
-  const level = riskTone(score);
-
-  return {
-    id: `warning-${patientId}`,
-    patientId,
-    level,
-    score,
-    reason: contributors.length ? contributors.join(" + ") : "ข้อมูลสุขภาพอยู่ในเกณฑ์คงที่",
-    contributors: contributors.length ? contributors : ["ค่าความดัน น้ำตาล และกิจกรรมยังสมดุล"],
-    doctorRecommendation:
-      level === "red"
-        ? "พิจารณานัดติดตามเร็วขึ้นและทบทวนยา"
-        : level === "orange"
-          ? "ติดตามค่าเช้า-เย็น 3 วันและประเมินแผนอาหาร"
-          : "ติดตามตามรอบปกติ",
-    patientRecommendation:
-      level === "red"
-        ? "วัดซ้ำ นั่งพัก และติดต่อทีมดูแลหากมีอาการผิดปกติ"
-        : "ทำตามแผนดูแล ดื่มน้ำ และบันทึกข้อมูลให้ครบ",
-    suggestedAction:
-      level === "red" ? "แจ้งแพทย์และผู้ดูแลทันที" : level === "orange" ? "ส่งเตือนผู้ดูแล" : "เฝ้าระวังต่อเนื่อง",
-    createdAt: isoDaysAgo(0)
-  };
 }
 
 function buildPatients(): Patient[] {
@@ -104,7 +35,7 @@ function buildPatients(): Patient[] {
     doctorId: `D-${(index % 5) + 1}`,
     caregiverId: `C-${String(index + 1).padStart(4, "0")}`,
     hospital: seed.hospitals[index % seed.hospitals.length],
-    healthScore: clamp(91 - index * 2 + (index % 4) * 3, 48, 94),
+    healthScore: null,
     email: index === 0 ? "patient@gmail.com" : `patient${index + 1}@gmail.com`,
     height: 165 + (index % 5) * 4,
     weight: 60 + (index % 6) * 3,
@@ -146,6 +77,7 @@ function buildRecords(patients: Patient[]): HealthRecord[] {
         systolic: Math.round(122 + (patientIndex % 8) * 3 + rise),
         diastolic: Math.round(76 + (patientIndex % 6) * 2 + rise / 2),
         bloodSugar: Math.round(112 + (patientIndex % 7) * 8 + Math.max(0, rise * 2)),
+        bloodSugarTiming: "after-meal",
         heartRate: Math.round(70 + (patientIndex % 5) * 3 + Math.sin(reverseDay) * 5),
         weight: Number((62 + patientIndex * 0.8 + reverseDay * (patientIndex % 6 === 0 ? 0.07 : 0.01)).toFixed(1)),
         height: patient.height || (165 + (patientIndex % 5) * 4),
@@ -174,12 +106,13 @@ function buildCarePlans(patients: Patient[]): CarePlan[] {
     diet: ["ลดเค็ม เลือกอาหารต้ม/นึ่ง", "แบ่งคาร์โบไฮเดรตเป็นมื้อเล็ก", "หลีกเลี่ยงเครื่องดื่มหวาน"],
     exercise: ["เดินเร็ว 20 นาที 5 วันต่อสัปดาห์", "ยืดเหยียดก่อนนอน 8 นาที"],
     measurement: ["วัดความดันเช้าและก่อนนอน", "บันทึกน้ำตาลหลังอาหาร 2 ชั่วโมง"],
-    followUp: ["พบแพทย์ตามนัดใน 14 วัน", "ส่งรายงานก่อนวันนัด 1 วัน"],
+    followUp: ["พบแพทย์ตามวันนัดในปฏิทิน", "ส่งรายงานก่อนวันนัด 1 วัน"],
     lifestyle: ["นอนก่อน 22:30 น.", "ดื่มน้ำ 6-8 แก้ว", "ฝึกหายใจช้า 3 นาทีเมื่อเครียด"],
-    // Preserve the appointment shown by the original prototype calendar.
+    // Demo dates stay in the future, including when cached data is loaded later.
     appointments: [{
       id: `${patient.id}-appointment-followup`,
-      date: "2026-07-16",
+      date: addCalendarDays(bangkokDate(), prototypeAppointmentOffset),
+      prototypeOffsetDays: prototypeAppointmentOffset,
       time: "09:30",
       title: "พบแพทย์ติดตามเบาหวานและความดัน",
       location: patient.hospital
@@ -240,16 +173,6 @@ function buildNotifications(patients: Patient[]): NotificationItem[] {
       patientId: patient.id,
       title: "ค้างยืนยันสัญญาณชีพ",
       message: "สมชาย สุขใจ ได้เพิ่มข้อมูลวัดระดับน้ำตาลในเลือดใหม่ รอคุณตรวจสอบและกดยืนยัน",
-      type: "caregiver",
-      date: isoDaysAgo(0),
-      read: false
-    },
-    {
-      id: "N-3-1",
-      userRole: "caregiver",
-      patientId: patient.id,
-      title: "วันนัดหมายพบแพทย์",
-      message: `พรุ่งนี้เวลา 09:30 น. ${patient.name} มีนัดพบแพทย์ติดตามผลเบาหวาน ณ ${patient.hospital}`,
       type: "caregiver",
       date: isoDaysAgo(0),
       read: false
@@ -333,7 +256,7 @@ export function createMockDatabase(): MockDatabase {
     )
   );
 
-  return {
+  return syncHealthSummaries({
     patients,
     doctors,
     caregivers,
@@ -360,7 +283,7 @@ export function createMockDatabase(): MockDatabase {
         }
       ]
     }
-  };
+  });
 }
 
 export const mockDb = createMockDatabase();

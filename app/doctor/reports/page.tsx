@@ -4,7 +4,7 @@ import { useState } from "react";
 import { HeartPulse } from "lucide-react";
 import { DoctorShell } from "@/components/layouts/doctor-shell";
 import { DoctorTabs, DoctorTabContent, EmptyState, PatientAvatar, planStatusLabel, RiskPill, SectionHeading } from "@/components/doctor/ui";
-import { DoctorHealthChart } from "@/components/doctor/health-chart";
+import { DoctorHealthChart } from "@/components/health/lazy-charts";
 import { useMockStore } from "@/lib/hooks/use-mock-store";
 import { formatThaiDate } from "@/lib/utils";
 

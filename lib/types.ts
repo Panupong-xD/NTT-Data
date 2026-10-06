@@ -23,7 +23,7 @@ export interface Patient {
   doctorId: string;
   caregiverId: string;
   hospital: string;
-  healthScore: number;
+  healthScore: number | null;
   email: string;
   dob?: string;
   weight?: number;
@@ -59,6 +59,7 @@ export interface HealthRecord {
   systolic: number;
   diastolic: number;
   bloodSugar: number;
+  bloodSugarTiming?: "before-meal" | "after-meal" | "unknown";
   heartRate: number;
   weight: number;
   height: number;
@@ -105,6 +106,7 @@ export interface CareAppointment {
   time: string;
   title: string;
   location?: string;
+  prototypeOffsetDays?: number;
 }
 
 export interface NotificationItem {

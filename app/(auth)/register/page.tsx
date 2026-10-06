@@ -5,14 +5,6 @@ import {
   UserPlus, 
   ArrowRight, 
   ArrowLeft, 
-  Calendar, 
-  Activity, 
-  Smartphone, 
-  IdCard, 
-  Briefcase, 
-  MapPin, 
-  User,
-  KeyRound,
   Eye,
   EyeOff,
   X
@@ -123,7 +115,7 @@ export default function RegisterPage() {
               setAmphures(parsedAmp);
               return;
             }
-          } catch (e) {
+          } catch {
             localStorage.removeItem("thai-provinces-list");
             localStorage.removeItem("thai-amphures-list");
           }

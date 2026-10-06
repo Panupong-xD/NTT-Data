@@ -28,10 +28,6 @@ export function loginWithEmail(email: string): AppUser {
   return user;
 }
 
-export function registerWithEmail(email: string): AppUser {
-  return loginWithEmail(email);
-}
-
 export function resetPassword(email: string) {
   localStorage.setItem("mock-reset-email", email);
 }
