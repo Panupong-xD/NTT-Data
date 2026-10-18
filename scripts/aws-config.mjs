@@ -1,0 +1,11 @@
+import { execFileSync } from "node:child_process";
+import { writeFileSync } from "node:fs";
+const [stack, region = "us-east-1"] = process.argv.slice(2);
+if (!stack || !["us-east-1", "ap-southeast-1", "ap-southeast-7"].includes(region)) throw new Error("Usage: node scripts/aws-config.mjs STACK_NAME ALLOWED_REGION");
+const data = JSON.parse(execFileSync("aws", ["cloudformation", "describe-stacks", "--stack-name", stack, "--region", region, "--output", "json"], { encoding: "utf8" }));
+const outputs = Object.fromEntries(data.Stacks[0].Outputs.map(item => [item.OutputKey, item.OutputValue]));
+const emailOtp = data.Stacks[0].Parameters?.some(p => p.ParameterKey === "EmailOtpEnabled" && p.ParameterValue === "true");
+for (const key of ["CognitoClientId", "CognitoDomain", "ApiEndpoint", "FrontendBucketName", "DynamoDBTableName"]) if (!outputs[key]) throw new Error(`Missing stack output: ${key}`);
+writeFileSync(".env.aws.local", `NEXT_PUBLIC_APP_MODE=aws\nNEXT_PUBLIC_AUTH_METHOD=${emailOtp ? "email_otp" : "password"}\nNEXT_PUBLIC_API_BASE_URL=\nNEXT_PUBLIC_COGNITO_CLIENT_ID=${outputs.CognitoClientId}\nNEXT_PUBLIC_COGNITO_DOMAIN=${outputs.CognitoDomain}\n`, { mode: 0o600 });
+console.log(JSON.stringify(outputs, null, 2));
+console.log("Created .env.aws.local. Run npm run build:aws, then upload out/ to FrontendBucketName with aws s3 sync.");

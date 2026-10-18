@@ -1,0 +1,11 @@
+import { readFileSync } from "node:fs";
+import assert from "node:assert/strict";
+const template = readFileSync("lambda-backend/template.yaml", "utf8");
+assert(!template.includes("AWS::CloudFront::"), "CloudFront is not permitted");
+assert(template.includes("AuthorizationType: JWT"));
+assert(template.includes("AuthorizationScopes: [openid]"));
+assert(!template.includes("Resource: '*'"), "Unscoped runtime permissions");
+assert(!template.includes("AllowOrigins: ['*']"), "Wildcard CORS");
+for (const file of ["lambda-backend/db.ts", "lib/services/ai/client.ts"]) assert(!readFileSync(file,"utf8").includes("ghvqrsbbdg"));
+assert(!readFileSync("next.config.ts","utf8").includes("ignoreBuildErrors: true"));
+console.log("Deployment invariants passed; use sam validate --lint for schema validation.");

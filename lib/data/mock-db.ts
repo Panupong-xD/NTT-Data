@@ -14,7 +14,7 @@ import { addCalendarDays, bangkokDate } from "@/lib/mobile-calendar";
 import { prototypeAppointmentOffset } from "@/lib/appointments";
 import { evaluateEarlyWarning, syncHealthSummaries } from "@/lib/health-summary";
 
-const today = new Date("2026-07-11T08:00:00+07:00");
+const today = new Date();
 
 function isoDaysAgo(days: number) {
   const date = new Date(today);

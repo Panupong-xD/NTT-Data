@@ -8,24 +8,30 @@ import { Input } from "@/components/ui/input";
 import { ChatMessage, AgentAction } from "@/lib/types";
 import { askAI, submitAgentAction } from "@/lib/services/ai/client";
 import { MarkdownRenderer } from "@/components/ui/markdown-renderer";
+import { isAwsMode } from "@/lib/runtime";
 import { toast } from "sonner";
 
 export function MockChat({
   title,
   seedMessages,
   mode,
-  context
+  patientId,
+  context: _context
 }: {
   title: string;
-  seedMessages: ChatMessage[];
+  seedMessages?: ChatMessage[] | null;
   mode: "patient" | "caregiver";
+  patientId?: string;
   context?: string;
 }) {
-  const [messages, setMessages] = useState<ChatMessage[]>(seedMessages);
+  const initialMessages = Array.isArray(seedMessages) ? seedMessages : [];
+  const seedCount = initialMessages.length;
+  const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
+  const [error, setError] = useState("");
   const [value, setValue] = useState("");
   const [thinking, setThinking] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
-  useEffect(() => { if (messages.length > seedMessages.length || thinking) bottomRef.current?.scrollIntoView({ behavior: "auto", block: "nearest" }); }, [messages.length, seedMessages.length, thinking]);
+  useEffect(() => { if (messages.length > seedCount || thinking) bottomRef.current?.scrollIntoView({ behavior: "auto", block: "nearest" }); }, [messages.length, seedCount, thinking]);
 
   async function handleActionDecision(messageId: string, action: AgentAction, decision: "approved" | "rejected") {
     const reviewedAt = new Intl.DateTimeFormat("th-TH", { hour: "2-digit", minute: "2-digit" }).format(new Date());
@@ -58,7 +64,8 @@ export function MockChat({
   }
 
   async function send() {
-    if (!value.trim()) return;
+    if (thinking || !value.trim()) return;
+    setError("");
     const now = new Intl.DateTimeFormat("th-TH", { hour: "2-digit", minute: "2-digit" }).format(new Date());
     const userQuestion = value;
     const userMsgId = `u-${Date.now()}`;
@@ -69,16 +76,16 @@ export function MockChat({
     setThinking(true);
 
     try {
-      const answer = await askAI(`${context ? `บริบทสุขภาพ: ${context}\n` : ""}คำถาม: ${userQuestion}`);
+      const answer = await askAI(userQuestion, undefined, { patientId });
 
       // Check if action proposal should be synthesized for Human-in-the-Loop criteria
-      const isActionOriented = 
+      const isActionOriented = !isAwsMode && (
         userQuestion.includes("ยา") || 
         userQuestion.includes("อาหาร") || 
         userQuestion.includes("ความดัน") || 
         userQuestion.includes("น้ำตาล") || 
         userQuestion.includes("แผน") ||
-        userQuestion.includes("ออกกำลัง");
+        userQuestion.includes("ออกกำลัง"));
 
       const generatedAction: AgentAction | undefined = isActionOriented
         ? {
@@ -103,17 +110,9 @@ export function MockChat({
           agentAction: generatedAction
         }
       ]);
-    } catch {
-      setMessages((current) => [
-        ...current,
-        {
-          id: assistantMsgId,
-          role: "assistant",
-          content:
-            "ผู้ช่วยยังไม่พร้อม ลองถามใหม่อีกครั้งนะ",
-          time: now
-        }
-      ]);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "ผู้ช่วยยังไม่พร้อม กรุณาลองอีกครั้ง";
+      setError(message.includes("AI is disabled") ? "ผู้ดูแลยังไม่ได้เปิดใช้งาน AI กรุณาติดต่อผู้ดูแลระบบ" : message);
     } finally {
       setThinking(false);
 
@@ -134,7 +133,8 @@ export function MockChat({
       {thinking&&<div role="status" className="flex items-center gap-2 px-1 text-sm text-sky-700"><span className="flex gap-1" aria-hidden="true"><span className="h-1.5 w-1.5 animate-bounce rounded-full bg-sky-400"/><span className="h-1.5 w-1.5 animate-bounce rounded-full bg-sky-400 [animation-delay:150ms]"/><span className="h-1.5 w-1.5 animate-bounce rounded-full bg-sky-400 [animation-delay:300ms]"/></span>กำลังคิดคำตอบ…</div>}
       <div ref={bottomRef}/>
     </div>
-    {messages.length===seedMessages.length&&<div className="my-4 flex flex-wrap gap-2">{prompts.map(prompt=><button key={prompt} type="button" onClick={()=>setValue(prompt)} className="min-h-11 rounded-full bg-white px-3 text-xs text-sky-700">{prompt}</button>)}</div>}
-    <form className="mt-4 flex gap-2 rounded-[22px] bg-white p-2" onSubmit={e=>{e.preventDefault();send();}}><label className="sr-only" htmlFor={`chat-${mode}`}>คำถามถึงผู้ช่วย</label><Input id={`chat-${mode}`} value={value} onChange={e=>setValue(e.target.value)} placeholder="อยากถามอะไรวันนี้?" disabled={thinking} className="min-w-0 flex-1 border-0 bg-transparent shadow-none"/><Button type="submit" size="icon" className="h-12 w-12 shrink-0 rounded-full" disabled={thinking||!value.trim()} aria-label="ส่งข้อความ">{thinking?<Loader2 className="h-5 w-5 animate-spin"/>:<Send className="h-5 w-5"/>}</Button></form>
+    {error && <p role="alert" className="my-3 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">{error}</p>}
+    {messages.length===seedCount&&<div className="my-4 flex flex-wrap gap-2">{prompts.map(prompt=><button key={prompt} type="button" onClick={()=>setValue(prompt)} className="min-h-11 rounded-full bg-white px-3 text-xs text-sky-700">{prompt}</button>)}</div>}
+    <form className="mt-4 flex gap-2 rounded-[22px] bg-white p-2" onSubmit={e=>{e.preventDefault();send();}}><label className="sr-only" htmlFor={`chat-${mode}`}>คำถามถึงผู้ช่วย</label><Input id={`chat-${mode}`} maxLength={3000} value={value} onChange={e=>setValue(e.target.value)} placeholder="อยากถามอะไรวันนี้?" disabled={thinking} className="min-w-0 flex-1 border-0 bg-transparent shadow-none"/><Button type="submit" size="icon" className="h-12 w-12 shrink-0 rounded-full" disabled={thinking||!value.trim()} aria-label="ส่งข้อความ">{thinking?<Loader2 className="h-5 w-5 animate-spin"/>:<Send className="h-5 w-5"/>}</Button></form>
   </section>;
 }

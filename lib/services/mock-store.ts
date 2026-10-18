@@ -1,5 +1,6 @@
 "use client";
 
+import { isAwsMode } from "@/lib/runtime";
 import { toast } from "sonner";
 import { createMockDatabase, mockDb } from "@/lib/data/mock-db";
 import { syncAppointments } from "@/lib/appointments";
@@ -67,12 +68,12 @@ export function addHealthRecord(db: MockDatabase, record: Omit<HealthRecord, "id
     id: `${record.patientId}-R-${Date.now()}`
   };
   const records = [...db.healthRecords, newRecord].sort((a, b) => a.date.localeCompare(b.date));
-  toast.success("บันทึกข้อมูลสุขภาพแล้ว");
+  if (!isAwsMode) toast.success("บันทึกข้อมูลสุขภาพแล้ว");
   return syncHealthSummaries({ ...db, healthRecords: records });
 }
 
 export function updateRecordStatus(db: MockDatabase, recordId: string, status: HealthRecord["confirmationStatus"]) {
-  toast.success(status === "confirmed" ? "ยืนยันข้อมูลแล้ว" : "อัปเดตสถานะแล้ว");
+  if (!isAwsMode) toast.success(status === "confirmed" ? "ยืนยันข้อมูลแล้ว" : "อัปเดตสถานะแล้ว");
   return {
     ...db,
     healthRecords: db.healthRecords.map((record) =>
@@ -82,7 +83,7 @@ export function updateRecordStatus(db: MockDatabase, recordId: string, status: H
 }
 
 export function deleteHealthRecord(db: MockDatabase, recordId: string) {
-  toast.success("ลบข้อมูลแล้ว");
+  if (!isAwsMode) toast.success("ลบข้อมูลแล้ว");
   return {
     ...db,
     healthRecords: db.healthRecords.filter((record) => record.id !== recordId)
@@ -90,7 +91,7 @@ export function deleteHealthRecord(db: MockDatabase, recordId: string) {
 }
 
 export function proposeTaskStatus(db: MockDatabase, planId: string, taskId: string, proposedStatus: CareTaskStatus) {
-  toast.success("บันทึกกิจกรรมแล้ว (ส่งรอยืนยันจากผู้ดูแล)");
+  if (!isAwsMode) toast.success("บันทึกกิจกรรมแล้ว (ส่งรอยืนยันจากผู้ดูแล)");
   return {
     ...db,
     carePlans: db.carePlans.map((plan) =>
@@ -105,7 +106,7 @@ export function proposeTaskStatus(db: MockDatabase, planId: string, taskId: stri
 }
 
 export function confirmTaskStatus(db: MockDatabase, planId: string, taskId: string, confirm: boolean) {
-  toast.success(confirm ? "ยืนยันการปฏิบัติกิจกรรมแล้ว" : "ปฏิเสธกิจกรรมแล้ว");
+  if (!isAwsMode) toast.success(confirm ? "ยืนยันการปฏิบัติกิจกรรมแล้ว" : "ปฏิเสธกิจกรรมแล้ว");
   return {
     ...db,
     carePlans: db.carePlans.map((plan) => {
@@ -124,7 +125,7 @@ export function confirmTaskStatus(db: MockDatabase, planId: string, taskId: stri
 }
 
 export function updateConsentStatus(db: MockDatabase, consentId: string, status: ConsentStatus) {
-  toast.success(status === "approved" ? "อนุมัติคำขอแล้ว" : "ปฏิเสธคำขอแล้ว");
+  if (!isAwsMode) toast.success(status === "approved" ? "อนุมัติคำขอแล้ว" : "ปฏิเสธคำขอแล้ว");
   return {
     ...db,
     consents: db.consents.map((consent) => (consent.id === consentId ? { ...consent, status } : consent))
@@ -144,7 +145,7 @@ export function createDoctorRequest(db: MockDatabase, patientId: string, doctorI
     date: new Date().toISOString(),
     read: false
   };
-  toast.success("ส่งคำขอไปยังผู้ป่วยแล้ว");
+  if (!isAwsMode) toast.success("ส่งคำขอไปยังผู้ป่วยแล้ว");
   const consent: ConsentRequest = {
     id: `CONSENT-${Date.now()}`,
     patientId,
@@ -183,7 +184,7 @@ export function publishCarePlan(db: MockDatabase, plan: CarePlan) {
     date: new Date().toISOString(),
     read: false
   };
-  toast.success("เผยแพร่แผนดูแลแล้ว");
+  if (!isAwsMode) toast.success("เผยแพร่แผนดูแลแล้ว");
   return {
     ...db,
     carePlans: db.carePlans.map((item) => (item.id === plan.id ? nextPlan : item)),

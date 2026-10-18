@@ -16,11 +16,13 @@ import { addHealthRecord, deleteHealthRecord } from "@/lib/services/mock-store";
 import { askAI } from "@/lib/services/ai/client";
 import { formatThaiDate } from "@/lib/utils";
 import { MarkdownRenderer } from "@/components/ui/markdown-renderer";
+import { isAwsMode } from "@/lib/runtime";
 import { useAuth } from "@/lib/hooks/use-auth";
 import { GlucoseTiming, glucoseStatus, glucoseTimingLabels } from "@/lib/health-status";
 
 function compressAndResizeImage(file: File, maxWidth = 800, maxHeight = 800, quality = 0.7): Promise<string> {
   return new Promise((resolve, reject) => {
+    if (file.size > 10 * 1024 * 1024) { reject(new Error("กรุณาใช้ภาพขนาดไม่เกิน 10 MB")); return; }
     const reader = new FileReader();
     reader.readAsDataURL(file);
     reader.onload = (event) => {
@@ -107,31 +109,17 @@ export default function PatientHealthPage() {
 
   const [bloodSugarTiming, setBloodSugarTiming] = useState<GlucoseTiming>("unknown");
   const [form, setForm] = useState({
-    systolic: String(latest.systolic),
-    diastolic: String(latest.diastolic),
-    bloodSugar: String(latest.bloodSugar),
-    weight: String(latest.weight),
-    sleepHours: "7",
-    heartRate: String(latest.heartRate || 72),
-    height: String(patient.height || 170)
+    systolic: "",
+    diastolic: "",
+    bloodSugar: "",
+    weight: "",
+    sleepHours: "",
+    heartRate: "",
+    height: ""
   });
 
   useEffect(() => {
-    if (latest) {
-      setForm({
-        systolic: String(latest.systolic),
-        diastolic: String(latest.diastolic),
-        bloodSugar: String(latest.bloodSugar),
-        weight: String(latest.weight),
-        sleepHours: "7",
-        heartRate: String(latest.heartRate || 72),
-        height: String(patient.height || 170)
-      });
-    }
-  }, [latest, patient.height]);
-
-  useEffect(() => {
-    if (patient && patient.id !== "P-0001") {
+    if (!isAwsMode && patient && patient.id !== "P-0001") {
       const patientRecords = db.healthRecords.filter(r => r.patientId === patient.id);
       if (patientRecords.length === 0) {
         const templateId = "P-0001";
@@ -178,6 +166,8 @@ export default function PatientHealthPage() {
 
   const [deviceScanning, setDeviceScanning] = useState(false);
   const [deviceImagePreview, setDeviceImagePreview] = useState("");
+  useEffect(() => () => { if (deviceImagePreview.startsWith("blob:")) URL.revokeObjectURL(deviceImagePreview); }, [deviceImagePreview]);
+  useEffect(() => () => { if (foodImage?.startsWith("blob:")) URL.revokeObjectURL(foodImage); }, [foodImage]);
   const [isVitalsCameraOpen, setIsVitalsCameraOpen] = useState(false);
   const [isFoodCameraOpen, setIsFoodCameraOpen] = useState(false);
 
@@ -188,7 +178,7 @@ export default function PatientHealthPage() {
     try {
       const filesArray = [
         {
-          type: "image",
+          type: "image/jpeg",
           name: "vitals_camera.jpg",
           data: base64Data
         }
@@ -215,7 +205,7 @@ export default function PatientHealthPage() {
         }, null, 2)
       ].join("\n");
 
-      let answer = await askAI(prompt, filesArray);
+      const answer = await askAI(prompt, filesArray);
 
       let cleanJson = answer.trim();
       const jsonMatch = cleanJson.match(/\{[\s\S]*\}/);
@@ -238,7 +228,7 @@ export default function PatientHealthPage() {
       } else {
         setForm((current) => {
           const next = { ...current };
-          let fillMsg = [];
+          const fillMsg = [];
 
           if (result.systolic && result.diastolic) {
             next.systolic = String(result.systolic);
@@ -281,7 +271,7 @@ export default function PatientHealthPage() {
     try {
       const filesArray = [
         {
-          type: "image",
+          type: "image/jpeg",
           name: "food_camera.jpg",
           data: base64Data
         }
@@ -356,7 +346,7 @@ export default function PatientHealthPage() {
       const base64Data = await compressAndResizeImage(file);
       const filesArray = [
         {
-          type: "image",
+          type: "image/jpeg",
           name: file.name.split(".")[0] + ".jpg",
           data: base64Data
         }
@@ -387,7 +377,8 @@ export default function PatientHealthPage() {
       try {
         answer = await askAI(prompt, filesArray);
       } catch (networkError) {
-        console.warn("Real AI scan failed, using filename-fallback OCR parser:", networkError);
+        if (isAwsMode) throw networkError;
+        console.warn("Demo scanner failed");
         const parsed = parseVitalsFromFilename(file.name);
         if (parsed) {
           answer = JSON.stringify(parsed);
@@ -417,7 +408,7 @@ export default function PatientHealthPage() {
       } else {
         setForm((current) => {
           const next = { ...current };
-          let fillMsg = [];
+          const fillMsg = [];
 
           if (result.systolic && result.diastolic) {
             next.systolic = String(result.systolic);
@@ -469,7 +460,7 @@ export default function PatientHealthPage() {
         weight: Number(form.weight),
         height: Number(form.height),
         sleepHours: Number(form.sleepHours),
-        exerciseMinutes: latest.exerciseMinutes,
+        exerciseMinutes: latest.exerciseMinutes ?? 0,
         medicationTaken: true,
         foodScore: 78,
         waterGlasses: 6,
@@ -495,14 +486,15 @@ export default function PatientHealthPage() {
         const base64Data = await compressAndResizeImage(file);
         const filesArray = [
           {
-            type: "image",
+            type: "image/jpeg",
             name: file.name.split(".")[0] + ".jpg",
             data: base64Data
           }
         ];
         setFoodFilesPayload(filesArray);
-        runFoodAnalysis(cleanName, filesArray);
+        runFoodAnalysis(isAwsMode ? "อาหารจากรูปที่อัปโหลด" : cleanName, filesArray);
       } catch (error) {
+        if (isAwsMode) { toast.error(error instanceof Error ? error.message : "อ่านรูปไม่ได้"); setScannerLoading(false); return; }
         console.error("Error reading file to base64:", error);
         setFoodFilesPayload([]);
         runFoodAnalysis(cleanName, []);
@@ -577,7 +569,7 @@ export default function PatientHealthPage() {
               {[["systolic","ความดันตัวบน","mmHg"],["diastolic","ความดันตัวล่าง","mmHg"],["bloodSugar","น้ำตาล","mg/dL"],["weight","น้ำหนัก","กก."]].map(([key,label,unit])=><div key={key}><label htmlFor={`vital-${key}`} className="mobile-form-label">{label}<span className="ml-1 text-[10px] text-slate-400">{unit}</span></label><Input id={`vital-${key}`} type="number" min="0" step="any" value={form[key as keyof typeof form]} onChange={e=>setForm(current=>({...current,[key]:e.target.value}))} inputMode="decimal"/></div>)}
             </div>
             <div className="mt-4"><label htmlFor="blood-sugar-timing" className="mobile-form-label">วัดน้ำตาลช่วงไหน?</label><select id="blood-sugar-timing" value={bloodSugarTiming} onChange={e => setBloodSugarTiming(e.target.value as GlucoseTiming)} className="min-h-11 w-full rounded-2xl border border-slate-200 bg-white px-3 text-sm text-slate-700"><option value="unknown">เลือกช่วงที่วัด</option><option value="before-meal">ก่อนอาหาร</option><option value="after-meal">หลังเริ่มอาหาร 1–2 ชั่วโมง</option></select>{bloodSugarTiming !== "unknown" && <p className="mt-2 text-xs text-slate-500">{glucoseStatus(Number(form.bloodSugar), bloodSugarTiming)?.label} · {glucoseTimingLabels[bloodSugarTiming]}</p>}</div>
-            <details className="mt-4"><summary className="flex min-h-11 items-center justify-between text-sm text-slate-500">การนอน ชีพจร และส่วนสูง<span className="text-sky-600">+</span></summary><div className="grid grid-cols-2 gap-3 pt-2">{[["sleepHours","เวลานอน (ชม.)"],["heartRate","ชีพจร (ครั้ง/นาที)"],["height","ส่วนสูง (ซม.)"]].map(([key,label])=><div key={key}><label className="mobile-form-label" htmlFor={`vital-${key}`}>{label}</label><Input id={`vital-${key}`} type="number" min="0" step="any" value={form[key as keyof typeof form]} onChange={e=>setForm(current=>({...current,[key]:e.target.value}))} inputMode="decimal"/></div>)}</div></details>
+            <section className="mt-4" aria-labelledby="additional-vitals-title"><h3 id="additional-vitals-title" className="mb-2 text-sm text-slate-500">การนอน ชีพจร และส่วนสูง</h3><div className="grid grid-cols-2 gap-3 pt-2">{[["sleepHours","เวลานอน (ชม.)"],["heartRate","ชีพจร (ครั้ง/นาที)"],["height","ส่วนสูง (ซม.)"]].map(([key,label])=><div key={key}><label className="mobile-form-label" htmlFor={`vital-${key}`}>{label}</label><Input id={`vital-${key}`} type="number" min="0" step="any" value={form[key as keyof typeof form]} onChange={e=>setForm(current=>({...current,[key]:e.target.value}))} inputMode="decimal"/></div>)}</div></section>
             <Button className="mt-5 h-12 w-full rounded-full" onClick={submitRecord}><CheckCircle2 className="h-4 w-4"/>บันทึกสุขภาพ</Button><p className="mt-2 text-center text-[11px] text-slate-500">ส่งให้ผู้ดูแลช่วยยืนยัน</p>
           </section>
           <section><h3 className="mobile-section-title mb-2">บันทึกล่าสุด</h3><ul className="divide-y divide-slate-200/60">{records.slice(-7).reverse().map(record=><li key={record.id} className="py-4"><div className="flex items-start justify-between gap-2"><div className="min-w-0"><p className="text-sm font-semibold">ความดัน {record.systolic}/{record.diastolic}</p><p className="mt-0.5 text-xs text-slate-500">น้ำตาล {record.bloodSugar} mg/dL · {formatThaiDate(record.date)}</p><p className={`mt-2 text-xs ${record.confirmationStatus==="confirmed"?"text-emerald-700":record.confirmationStatus==="rejected"?"text-rose-600":"text-amber-700"}`}>{record.confirmationStatus==="confirmed"?"ผู้ดูแลยืนยันแล้ว":record.confirmationStatus==="rejected"?"ให้ตรวจสอบอีกครั้ง":"รอผู้ดูแลยืนยัน"}</p></div><Button size="icon" variant="ghost" aria-label={`ลบบันทึก ${formatThaiDate(record.date)}`} onClick={()=>setDb(deleteHealthRecord(db,record.id))}><Trash2 className="h-4 w-4 text-slate-400"/></Button></div></li>)}</ul>{!records.length&&<p className="py-6 text-sm text-slate-500">ยังไม่มีบันทึกสุขภาพ</p>}</section>
@@ -590,7 +582,7 @@ export default function PatientHealthPage() {
           <form className="mt-4 space-y-3" onSubmit={e=>{e.preventDefault();if(foodNameInput.trim()){setScannerReady(true);runFoodAnalysis(foodNameInput,foodFilesPayload);}}}><label htmlFor="food-name" className="mobile-form-label">หรือพิมพ์ชื่อเมนู</label><Input id="food-name" placeholder="เช่น ข้าวกะเพราไข่ดาว" value={foodNameInput} onChange={e=>setFoodNameInput(e.target.value)} disabled={scannerLoading}/><Button className="h-12 w-full rounded-full" disabled={scannerLoading||!foodNameInput.trim()}>{scannerLoading?<Loader2 className="h-4 w-4 animate-spin"/>:<Utensils className="h-4 w-4"/>}{scannerLoading?"กำลังดูสารอาหาร…":"ดูสารอาหาร"}</Button></form></section>
           {scannerReady&&foodAnalysis&&!scannerLoading&&<section className="care-sheet p-5"><h3 className="mobile-section-title">{foodAnalysis.name}</h3><p className="mt-2 text-[30px] font-bold text-sky-700">{foodAnalysis.calories}</p><dl className="mt-5 grid grid-cols-2 gap-x-4 gap-y-3 border-t border-slate-100 pt-4">{[["โปรตีน",foodAnalysis.protein],["คาร์โบไฮเดรต",foodAnalysis.carbs],["ไขมัน",foodAnalysis.fat],["น้ำตาล",foodAnalysis.sugar],["โซเดียม",foodAnalysis.sodium],["คะแนนโภชนาการ",foodAnalysis.score]].map(([label,value])=><div key={label}><dt className="text-xs text-slate-500">{label}</dt><dd className="mt-1 text-sm font-semibold">{value}</dd></div>)}</dl><div className="mt-5 border-t border-slate-100 pt-4 text-sm leading-7 text-slate-600"><MarkdownRenderer content={foodAnalysis.recommendation}/></div></section>}
         </TabsContent>
-        <TabsContent value="ai"><MockChat title="เพื่อนสุขภาพ" seedMessages={db.chatHistory.patient} mode="patient" context={`ผู้ป่วย ${patient.name}; diagnosis ${patient.diagnosis.join(", ")}; medication ${patient.medications.join(", ")}; BP ล่าสุด ${latest.systolic}/${latest.diastolic}; blood sugar ล่าสุด ${latest.bloodSugar}; exercise ${latest.exerciseMinutes} นาที; sleep ${latest.sleepHours} ชั่วโมง`}/></TabsContent>
+        <TabsContent value="ai"><MockChat title="เพื่อนสุขภาพ" seedMessages={db.chatHistory?.patient} patientId={patient.id} mode="patient"/></TabsContent>
       </Tabs>
 
       {/* Vitals Scanner Camera Modal */}
@@ -618,58 +610,45 @@ interface CameraModalProps {
 
 function CameraModal({ isOpen, onClose, onCapture }: CameraModalProps) {
   const [stream, setStream] = useState<MediaStream | null>(null);
+  const [attempt, setAttempt] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
   useEffect(() => {
-    if (isOpen) {
-      startCamera();
-    } else {
-      stopCamera();
-    }
-    return () => stopCamera();
-  }, [isOpen]);
-
-  async function startCamera() {
+    setStream(null);
+    if (!isOpen) return;
+    let cancelled = false;
+    if (!navigator.mediaDevices?.getUserMedia) { setError("กล้องต้องใช้งานผ่าน HTTPS และ browser ที่รองรับ"); return; }
     setError(null);
-    try {
-      const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: "environment",
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
-        },
-        audio: false
-      });
-      setStream(mediaStream);
-      if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
-      }
-    } catch (err) {
-      console.error("Camera access failed:", err);
-      setError("ไม่สามารถเข้าถึงกล้องได้ (ตรวจสอบสิทธิ์กล้องแล้วลองอีกครั้ง)");
-    }
-  }
-
-  function stopCamera() {
-    if (stream) {
-      stream.getTracks().forEach((track) => track.stop());
-      setStream(null);
-    }
-  }
+    void navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+      .then(mediaStream => {
+        if (cancelled) { mediaStream.getTracks().forEach(track => track.stop()); return; }
+        streamRef.current = mediaStream;
+        setStream(mediaStream);
+        if (videoRef.current) videoRef.current.srcObject = mediaStream;
+      })
+      .catch(() => { if (!cancelled) setError("ไม่สามารถเข้าถึงกล้องได้ (ตรวจสอบสิทธิ์กล้องแล้วลองอีกครั้ง)"); });
+    return () => {
+      cancelled = true;
+      streamRef.current?.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    };
+  }, [isOpen, attempt]);
 
   function handleCapture() {
     if (videoRef.current) {
       const video = videoRef.current;
       const canvas = document.createElement("canvas");
 
-      canvas.width = video.videoWidth || 1280;
-      canvas.height = video.videoHeight || 720;
+      const scale = Math.min(1, 800 / (video.videoWidth || 1280), 800 / (video.videoHeight || 720));
+      canvas.width = Math.round((video.videoWidth || 1280) * scale);
+      canvas.height = Math.round((video.videoHeight || 720) * scale);
 
       const ctx = canvas.getContext("2d");
       if (ctx) {
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const base64 = canvas.toDataURL("image/jpeg", 0.85);
+        const base64 = canvas.toDataURL("image/jpeg", 0.7);
         onCapture(base64);
         onClose();
       }
@@ -705,7 +684,7 @@ function CameraModal({ isOpen, onClose, onCapture }: CameraModalProps) {
             <div className="p-6 text-center text-xs text-rose-400 bg-rose-950/20 max-w-[85%] rounded-2xl border border-rose-900/30 space-y-3 z-10">
               <p className="font-bold text-sm">⚠️ การเชื่อมต่อกล้องขัดข้อง</p>
               <p className="leading-relaxed">{error}</p>
-              <Button onClick={startCamera} type="button" className="bg-sky-600 hover:bg-sky-700 font-bold px-6 py-2 rounded-xl mt-2 w-full">
+              <Button onClick={() => setAttempt(value => value + 1)} type="button" className="bg-sky-600 hover:bg-sky-700 font-bold px-6 py-2 rounded-xl mt-2 w-full">
                 เชื่อมต่อกล้องอีกครั้ง
               </Button>
             </div>

@@ -1,11 +1,12 @@
 version = 0.1
 
 [default.deploy.parameters]
-stack_name = "wellync-backend"
+stack_name = "wellync-prototype"
 resolve_s3 = true
-s3_prefix = "wellync-backend"
+s3_prefix = "wellync-prototype"
 region = "us-east-1"
 capabilities = "CAPABILITY_IAM"
+confirm_changeset = true
 image_repositories = []
 
 [default.global.parameters]

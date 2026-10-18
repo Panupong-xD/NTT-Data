@@ -3,6 +3,8 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { isAwsMode } from "@/lib/runtime";
+import { beginSignIn, currentCloudUser, cloudSignOut, accessToken } from "@/lib/services/cloud-auth";
 import { AppUser, UserRole } from "@/lib/types";
 import { getRoleFromEmail, loginWithEmail, logoutUser, readMockUser, resetPassword } from "@/lib/services/auth";
 import { useMockStore } from "@/lib/hooks/use-mock-store";
@@ -19,16 +21,27 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<AppUser | null>(() => readMockUser());
-  const [loading] = useState(false);
+  const [user, setUser] = useState<AppUser | null>(() => isAwsMode ? null : readMockUser());
   const router = useRouter();
+  const [loading, setLoading] = useState(isAwsMode);
+  useEffect(() => {
+    if (!isAwsMode) return;
+    let active = true;
+    if (accessToken()) currentCloudUser().then(u => { if (active) setUser(u); }).catch(() => { if (active) setUser(null); }).finally(() => { if (active) setLoading(false); });
+    else setLoading(false);
+    const expired = () => { setUser(null); router.replace("/login/"); };
+    window.addEventListener("wellync-auth-expired", expired);
+    const timer = window.setInterval(() => { if (!accessToken()) setUser(null); }, 30000);
+    return () => { active = false; clearInterval(timer); window.removeEventListener("wellync-auth-expired", expired); };
+  }, [router]);
   const { setDb } = useMockStore();
 
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
       loading,
-      login: async (email, password) => {
+      login: async (email, _password) => {
+        if (isAwsMode) { await beginSignIn(); throw new Error("กำลังไปหน้าเข้าสู่ระบบ"); }
         const { loadMockStore } = await import("@/lib/services/mock-store");
         const db = loadMockStore();
         const role = getRoleFromEmail(email);
@@ -82,6 +95,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return nextUser;
       },
       register: async (email, password, name, extra) => {
+        if (isAwsMode) throw new Error("กรุณาติดต่อผู้ดูแลระบบเพื่อสร้างบัญชีและกำหนดสิทธิ์");
         const patientId = `HN-${Math.floor(100000 + Math.random() * 900000)}`;
         const role = extra?.role || "patient";
         
@@ -233,10 +247,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return nextUser;
       },
       forgotPassword: async (email) => {
+        if (isAwsMode) { await beginSignIn(); return; }
         resetPassword(email);
         toast.success("ส่งคำแนะนำรีเซ็ตรหัสผ่านแล้ว");
       },
       logout: async () => {
+        if (isAwsMode) { cloudSignOut(); return; }
         logoutUser();
         setUser(null);
         if (typeof window !== "undefined") {

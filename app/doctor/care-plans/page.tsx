@@ -1,7 +1,7 @@
 "use client";
 
 import * as Dialog from "@radix-ui/react-dialog";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { CalendarDays, Check, ClipboardList, Dumbbell, Edit3, Loader2, Pill, Plus, Save, Sparkles, Utensils, X, Heart } from "lucide-react";
 import { toast } from "sonner";
 import { DoctorShell } from "@/components/layouts/doctor-shell";
@@ -10,6 +10,7 @@ import { MarkdownRenderer } from "@/components/ui/markdown-renderer";
 import { useMockStore } from "@/lib/hooks/use-mock-store";
 import { publishCarePlan } from "@/lib/services/mock-store";
 import { askAI } from "@/lib/services/ai/client";
+import { isAwsMode } from "@/lib/runtime";
 import { CarePlan } from "@/lib/types";
 import { formatThaiDate } from "@/lib/utils";
 
@@ -30,27 +31,28 @@ export default function DoctorCarePlansPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [createPatient, setCreatePatient] = useState(db.patients[0]?.id || "");
   const [createFields, setCreateFields] = useState<Fields>(fieldsOf(db.carePlans.find(p => p.patientId === createPatient)));
-  useEffect(() => { const id = new URLSearchParams(window.location.search).get("patient"); const plan = db.carePlans.find(p => p.patientId === id); if (plan) setSelectedId(plan.id); }, []);
+  const deepLinkApplied = useRef(false);
+  useEffect(() => { if (deepLinkApplied.current) return; const id = new URLSearchParams(window.location.search).get("patient"); const plan = db.carePlans.find(p => p.patientId === id); if (plan) { setSelectedId(plan.id); deepLinkApplied.current = true; } }, [db.carePlans]);
   const selected = db.carePlans.find(p => p.id === selectedId);
   const patient = db.patients.find(p => p.id === selected?.patientId);
   const plans = db.carePlans.filter(p => (filter === "all" || (filter === "draft" ? p.status !== "published" : p.status === "published")) && `${db.patients.find(patient => patient.id === p.patientId)?.name} ${p.patientId}`.toLowerCase().includes(query.toLowerCase()));
   function saveEdit() {
     if (!selected || !fields.summary.trim()) { toast.error("กรุณาระบุสรุปแผนดูแล"); return; }
     setDb(current => ({ ...current, carePlans:current.carePlans.map(p => p.id === selected.id ? { ...p, ...arraysOf(fields), summary:fields.summary.trim(), status:"draft", updatedAt:new Date().toISOString() } : p) }));
-    setEditing(false); toast.success("บันทึกร่างแผนแล้ว");
+    setEditing(false); toast.success(isAwsMode ? "เก็บร่างในแท็บนี้แล้ว กดอนุมัติเพื่อบันทึกบน AWS" : "บันทึกร่างแผนแล้ว");
   }
   function saveCreate() {
     if (!createPatient || !createFields.summary.trim()) { toast.error("กรุณาเลือกผู้ป่วยและเขียนสรุปแผน"); return; }
     const existing = db.carePlans.find(p => p.patientId === createPatient);
     const plan: CarePlan = { ...(existing || { id:`PLAN-${Date.now()}`, tasks:[] }), patientId:createPatient, doctorId:db.doctors[0]?.id || "DOC-001", status:"draft", updatedAt:new Date().toISOString(), summary:createFields.summary.trim(), ...arraysOf(createFields) };
     setDb(current => ({ ...current, carePlans:existing ? current.carePlans.map(p => p.id === existing.id ? plan : p) : [...current.carePlans,plan] }));
-    setSelectedId(plan.id); setEditing(false); setFilter("all"); setQuery(""); setCreateOpen(false); toast.success("บันทึกร่างแผนแล้ว");
+    setSelectedId(plan.id); setEditing(false); setFilter("all"); setQuery(""); setCreateOpen(false); toast.success(isAwsMode ? "เก็บร่างในแท็บนี้แล้ว กดอนุมัติเพื่อบันทึกบน AWS" : "บันทึกร่างแผนแล้ว");
   }
   async function rewrite() {
     if (!selected || !patient) return;
     setRewriting(true);
     try {
-      const answer = await askAI(["ตอบเป็นภาษาไทย สรุปแผนดูแลที่บ้านสำหรับแพทย์ 1 ย่อหน้า ไม่เกิน 3 ประโยค", `ผู้ป่วย: ${patient.name}`, `การวินิจฉัย: ${patient.diagnosis.join(", ")}`, `ยา: ${patient.medications.join(", ")}`, `ร่างเดิม: ${selected.summary}`].join("\n"), undefined, { patientId:patient.id });
+      const answer = await askAI(["ตอบเป็นภาษาไทย สรุปแผนดูแลที่บ้านสำหรับแพทย์ 1 ย่อหน้า ไม่เกิน 3 ประโยค", `การวินิจฉัย: ${patient.diagnosis.join(", ")}`, `ยา: ${patient.medications.join(", ")}`, `ร่างเดิม: ${selected.summary}`].join("\n"), undefined, { patientId:patient.id });
       if (!answer.trim()) throw new Error("ยังไม่ได้รับคำแนะนำ กรุณาลองอีกครั้ง");
       setDb(current => ({ ...current, carePlans:current.carePlans.map(p => p.id === selected.id ? { ...p, summary:answer, status:"draft", updatedAt:new Date().toISOString() } : p) }));
       toast.success("ปรับร่างแล้ว กรุณาตรวจสอบก่อนส่งต่อ");

@@ -1,0 +1,5 @@
+{
+  "patient": "patient@example.test",
+  "caregiver": "caregiver@example.test",
+  "doctor": "doctor@example.test"
+}

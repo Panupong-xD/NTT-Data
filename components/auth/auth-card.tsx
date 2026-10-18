@@ -1,5 +1,6 @@
 "use client";
 
+import { isAwsMode } from "@/lib/runtime";
 import Link from "next/link";
 import { HeartPulse } from "lucide-react";
 
@@ -34,10 +35,10 @@ export function AuthCard({
           {children}
           {footer ? <div className="text-center text-sm text-slate-500">{footer}</div> : null}
         </div>
-        <aside className="mt-4 rounded-2xl bg-white/70 p-4 text-xs leading-6 text-slate-500 shadow-card">
+        {!isAwsMode && <aside className="mt-4 rounded-2xl bg-white/70 p-4 text-xs leading-6 text-slate-500 shadow-card">
           <p className="font-semibold text-slate-700">บัญชีตัวอย่าง</p>
           <p>patient@gmail.com / caregiver@gmail.com / doctor@gmail.com</p>
-        </aside>
+        </aside>}
       </section>
     </main>
   );

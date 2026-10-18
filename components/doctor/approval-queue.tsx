@@ -28,7 +28,7 @@ export function ApprovalQueue({ onCount, compact = false }: { onCount?: (count: 
   async function decide(item: ApprovalEntity, decision: "APPROVED" | "REJECTED") {
     setBusy(item.actionId);
     try {
-      const response = await submitApprovalDecision(item.actionId, decision, db.doctors[0]?.id || "DOC-001");
+      const response = await submitApprovalDecision(item.actionId, decision, db.doctors[0]?.id, undefined, item.patientId);
       setItems(current => current.map(a => a.actionId === item.actionId ? { ...a, status: decision, reviewedAt: new Date().toISOString(), reviewedBy: db.doctors[0]?.name } : a));
       toast.success(response?.local ? "บันทึกการพิจารณาในโหมดตัวอย่างแล้ว" : decision === "APPROVED" ? "อนุมัติข้อเสนอแล้ว" : "ปฏิเสธข้อเสนอแล้ว");
     } catch { toast.error("บันทึกไม่สำเร็จ กรุณาลองอีกครั้ง"); }

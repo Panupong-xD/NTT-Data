@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { AlertCircle, ArrowUpRight, Check, FileText, Loader2, LockKeyhole, ShieldCheck, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { DoctorShell } from "@/components/layouts/doctor-shell";
@@ -20,7 +20,8 @@ export default function DoctorPatientsPage() {
   const [tab, setTab] = useState("summary");
   const [draft, setDraft] = useState(db.carePlans.find(p => p.patientId === selectedId)?.summary || "");
   const [rewriting, setRewriting] = useState(false);
-  useEffect(() => { const id = new URLSearchParams(window.location.search).get("patient"); if (id && db.patients.some(p => p.id === id)) { setSelectedId(id); setDraft(db.carePlans.find(p => p.patientId === id)?.summary || ""); } }, []); // Read the initial deep link without coupling selection to navigation.
+  const deepLinkApplied = useRef(false);
+  useEffect(() => { if (deepLinkApplied.current) return; const id = new URLSearchParams(window.location.search).get("patient"); if (id && db.patients.some(p => p.id === id)) { setSelectedId(id); setDraft(db.carePlans.find(p => p.patientId === id)?.summary || ""); deepLinkApplied.current = true; } }, [db.carePlans, db.patients]);
   const selected = db.patients.find(p => p.id === selectedId);
   const patients = db.patients.filter(p => `${p.id} ${p.citizenId} ${p.name}`.toLowerCase().includes(query.toLowerCase()));
   const records = db.healthRecords.filter(r => r.patientId === selectedId).sort((a,b) => a.date.localeCompare(b.date));
@@ -33,7 +34,7 @@ export default function DoctorPatientsPage() {
     if (!selected || !approved || !plan) return;
     setRewriting(true);
     try {
-      const answer = await askAI(["ตอบเป็นภาษาไทยในรูปแบบแผนดูแลที่บ้านสำหรับแพทย์ แบ่งหัวข้อยา อาหาร การออกกำลัง การวัดค่า การติดตาม และการใช้ชีวิต", `ผู้ป่วย: ${selected.name}`, `Diagnosis: ${selected.diagnosis.join(", ")}`, `Medication: ${selected.medications.join(", ")}`, `ข้อมูลล่าสุด: ${latest ? `BP ${latest.systolic}/${latest.diastolic}, Blood Sugar ${latest.bloodSugar}, Sleep ${latest.sleepHours}, Exercise ${latest.exerciseMinutes} นาที` : "ยังไม่มีบันทึก"}`, `ร่างเดิม: ${draft}`].join("\n"), undefined, { patientId: selected.id });
+      const answer = await askAI(["ตอบเป็นภาษาไทยในรูปแบบแผนดูแลที่บ้านสำหรับแพทย์ แบ่งหัวข้อยา อาหาร การออกกำลัง การวัดค่า การติดตาม และการใช้ชีวิต", `Diagnosis: ${selected.diagnosis.join(", ")}`, `Medication: ${selected.medications.join(", ")}`, `ข้อมูลล่าสุด: ${latest ? `BP ${latest.systolic}/${latest.diastolic}, Blood Sugar ${latest.bloodSugar}, Sleep ${latest.sleepHours}, Exercise ${latest.exerciseMinutes} นาที` : "ยังไม่มีบันทึก"}`, `ร่างเดิม: ${draft}`].join("\n"), undefined, { patientId: selected.id });
       if (!answer.trim()) throw new Error("ยังไม่ได้รับคำแนะนำ กรุณาลองอีกครั้ง");
       setDraft(answer);
     } catch (error) { toast.error(error instanceof Error ? error.message : "ยังปรับแผนไม่ได้ กรุณาลองอีกครั้ง"); }

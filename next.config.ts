@@ -7,16 +7,10 @@ const nextConfig: NextConfig = {
     unoptimized: true
   },
   devIndicators: false,
-  serverExternalPackages: ["got-scraping"],
   experimental: {
     optimizePackageImports: ["lucide-react", "recharts"]
   },
-  eslint: {
-    ignoreDuringBuilds: true
-  },
-  typescript: {
-    ignoreBuildErrors: true
-  }
+  typescript: { ignoreBuildErrors: false }
 };
 
 export default nextConfig;

@@ -8,3 +8,9 @@ dist
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+.aws-sam/
+.env.aws.local
+lambda-backend/samconfig-otp.toml
+*.tsbuildinfo
+lambda-backend/node_modules/
+lambda-backend/dist/

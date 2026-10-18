@@ -1,78 +1,25 @@
-import { 
-  getApprovals, 
-  updateApprovalStatus, 
-  createApproval, 
-  ApprovalEntity 
-} from "./db.js";
+import { z } from "zod";
+import { authorizePatient, HttpError, id, type Identity } from "./security.js";
+import { decideApproval, queryItems } from "./db.js";
 
-/**
- * Handle GET /api/approvals
- */
-export async function handleGetApprovals(queryParams?: Record<string, string>) {
-  const status = (queryParams?.status || "ALL").toUpperCase() as "PENDING" | "APPROVED" | "REJECTED" | "ALL";
-  const items = await getApprovals(status);
-  return {
-    count: items.length,
-    statusFilter: status,
-    approvals: items
-  };
-}
-
-/**
- * Handle POST /api/approvals/:id or POST /api/approvals
- */
-export async function handleApprovalDecision(body: {
-  actionId: string;
-  decision: "APPROVED" | "REJECTED";
-  doctorId?: string;
-  note?: string;
-}) {
-  if (!body.actionId) {
-    throw new Error("actionId is required");
+export const decisionSchema = z.object({ actionId: id, patientId: id, decision: z.enum(["APPROVED", "REJECTED"]), note: z.string().max(1000).optional() }).strict();
+export async function handleGetApprovals(identity: Identity, status = "ALL") {
+  if (identity.role !== "doctor") throw new HttpError(403, "Doctor role required");
+  if (!["ALL", "PENDING", "APPROVED", "REJECTED"].includes(status)) throw new HttpError(400, "Invalid status");
+  const approvals = [];
+  for (const patientId of identity.patientIds) {
+    try { await authorizePatient(identity, patientId); }
+    catch (error) { if (error instanceof HttpError && error.status === 403) continue; throw error; }
+    const items = await queryItems(`PATIENT#${patientId}`, "APPROVAL#");
+    approvals.push(...items.filter(item => (!item.ttl || item.ttl > Date.now() / 1000) && (status === "ALL" || item.status === status)).map(({ PK: _PK, SK: _SK, ...item }) => item));
   }
-
-  if (body.decision !== "APPROVED" && body.decision !== "REJECTED") {
-    throw new Error("decision must be either APPROVED or REJECTED");
-  }
-
-  const result = await updateApprovalStatus(
-    body.actionId,
-    body.decision,
-    body.doctorId || "DOC-001",
-    body.note
-  );
-
-  return {
-    success: true,
-    actionId: body.actionId,
-    decision: body.decision,
-    reviewedAt: result?.reviewedAt,
-    reviewedBy: result?.reviewedBy,
-    updatedRecord: result
-  };
+  return { approvals, count: approvals.length };
 }
-
-/**
- * Handle POST /api/approvals/create (Manual trigger / Simulation)
- */
-export async function handleCreateApproval(body: Partial<ApprovalEntity>) {
-  const newApproval: ApprovalEntity = {
-    actionId: body.actionId || `APP-${Date.now().toString().slice(-6)}`,
-    patientId: body.patientId || "P-0001",
-    patientName: body.patientName || "สมชาย มีสุขภาพดี",
-    type: body.type || "medication-change",
-    title: body.title || "ขออนุมัติปรับแผนการรักษา",
-    description: body.description || "AI ตรวจพบความจำเป็นในการปรับแผนการดูแล",
-    clinicalReason: body.clinicalReason || "Clinical Guideline Compliance",
-    suggestedAction: body.suggestedAction || "ปรับขนาดยาตามคำแนะนำ",
-    confidence: body.confidence || 0.95,
-    status: "PENDING",
-    createdAt: new Date().toISOString()
-  };
-
-  await createApproval(newApproval);
-  return {
-    success: true,
-    approval: newApproval
-  };
+export async function handleApprovalDecision(identity: Identity, input: unknown) {
+  if (identity.role !== "doctor") throw new HttpError(403, "Doctor role required");
+  const body = decisionSchema.parse(input);
+  await authorizePatient(identity, body.patientId);
+  const updatedRecord = await decideApproval(body.patientId, body.actionId, body.decision, identity.entityId, body.note);
+  // This is a recorded review only. It never executes medication or treatment changes.
+  return { success: true, updatedRecord };
 }

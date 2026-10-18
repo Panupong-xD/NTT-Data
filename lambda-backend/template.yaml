@@ -1,98 +1,341 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: Wellync Serverless Backend ($0 Base Cost) - DynamoDB Single-Table + Amazon Bedrock + AWS Lambda
-
+Description: Wellync AWS prototype - HTTPS static frontend from private S3 through API Gateway and Lambda, Cognito, DynamoDB and bounded Bedrock inference. No CloudFront.
+Metadata:
+  AWSToolsMetrics:
+    AWSAgentToolkit: aws-cloudformation@3
+  com.aws.cloudformation.Context:
+    arch: Browser -> HTTP API -> static Lambda/private S3 or JWT backend Lambda/DynamoDB/Bedrock
+    must: [No CloudFront, No public patient objects, No cross-region inference, Server-side consent checks]
+    ref: [DEPLOY.md, docs/aws-readiness.md]
+Parameters:
+  EmailOtpEnabled:
+    Type: String
+    Default: 'false'
+    AllowedValues: ['true', 'false']
+    Description: Enable passwordless email OTP after SES sender and recipients are ready (Essentials pricing).
+  CognitoSenderEmail:
+    Type: String
+    Default: ''
+    AllowedPattern: '^$|^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$'
+    Description: SES verified email identity in this account and stack region, required for email OTP.
+  CognitoDomainPrefix:
+    Type: String
+    AllowedPattern: '[a-z0-9][a-z0-9-]{2,45}'
+    Description: Globally unique Cognito login domain prefix
+  AIEnabled:
+    Type: String
+    Default: 'false'
+    AllowedValues: ['true', 'false']
+  BedrockModel:
+    Type: String
+    Default: amazon.nova-micro-v1:0
+    AllowedValues: [amazon.nova-micro-v1:0, amazon.nova-lite-v1:0]
+  BedrockVisionModel:
+    Type: String
+    Default: ''
+    AllowedValues: ['', amazon.nova-lite-v1:0]
+  AIUserDailyUnits:
+    Type: Number
+    Default: 200000
+    MinValue: 20000
+    MaxValue: 2000000
+  AIGlobalDailyUnits:
+    Type: Number
+    Default: 2000000
+    MinValue: 20000
+    MaxValue: 20000000
+Rules:
+  OtpRequiresSender:
+    RuleCondition: !Equals [!Ref EmailOtpEnabled, 'true']
+    Assertions:
+      - Assert: !Not [!Equals [!Ref CognitoSenderEmail, '']]
+        AssertDescription: Email OTP requires a verified SES sender email in the same account and region.
+  CompetitionRegion:
+    Assertions:
+      - Assert: !Contains [[us-east-1, ap-southeast-1, ap-southeast-7], !Ref 'AWS::Region']
+        AssertDescription: Only regions permitted by the competition may be used.
+Conditions:
+  UseEmailOtp: !Equals [!Ref EmailOtpEnabled, 'true']
 Globals:
   Function:
-    Timeout: 30
+    Runtime: nodejs22.x
+    Architectures: [arm64]
     MemorySize: 512
-    Runtime: nodejs20.x
-    Architectures:
-      - arm64
-
+    Timeout: 28
 Resources:
-  # 1. DynamoDB Single-Table (On-Demand Mode = $0 Base Cost)
+  # Private immutable frontend assets only; never upload records or secrets here.
+  FrontendBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault: {SSEAlgorithm: AES256}
+      VersioningConfiguration: {Status: Enabled}
+      LifecycleConfiguration:
+        Rules:
+          - Id: ExpireOldBuildVersions
+            Status: Enabled
+            NoncurrentVersionExpiration: {NoncurrentDays: 7}
+            AbortIncompleteMultipartUpload: {DaysAfterInitiation: 1}
+  FrontendBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref FrontendBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Deny
+            Principal: '*'
+            Action: s3:*
+            Resource: [!GetAtt FrontendBucket.Arn, !Sub '${FrontendBucket.Arn}/*']
+            Condition: {Bool: {'aws:SecureTransport': 'false'}}
+  # Stable PK/SK table with encryption, recovery and retention; no shared physical name.
   HealthcareAgentTable:
     Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
-      TableName: HealthcareAgentTable
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
-        - AttributeName: PK
-          AttributeType: S
-        - AttributeName: SK
-          AttributeType: S
+        - {AttributeName: PK, AttributeType: S}
+        - {AttributeName: SK, AttributeType: S}
       KeySchema:
-        - AttributeName: PK
-          KeyType: HASH
-        - AttributeName: SK
-          KeyType: RANGE
-      TimeToLiveSpecification:
-        AttributeName: ttl
-        Enabled: true
-      Tags:
-        - Key: Project
-          Value: Wellync
-        - Key: Environment
-          Value: Production
-
-  # 2. HTTP API Gateway with CORS
+        - {AttributeName: PK, KeyType: HASH}
+        - {AttributeName: SK, KeyType: RANGE}
+      SSESpecification: {SSEEnabled: true}
+      PointInTimeRecoverySpecification: {PointInTimeRecoveryEnabled: true}
+      TimeToLiveSpecification: {AttributeName: ttl, Enabled: true}
+  # Explicit routes avoid a circular dependency between callback URL and JWT audience.
   WellyncHttpApi:
-    Type: AWS::Serverless::HttpApi
+    Type: AWS::ApiGatewayV2::Api
     Properties:
+      Name: !Sub '${AWS::StackName}-http'
+      ProtocolType: HTTP
       CorsConfiguration:
-        AllowOrigins:
-          - '*'
-        AllowMethods:
-          - GET
-          - POST
-          - PUT
-          - DELETE
-          - OPTIONS
-        AllowHeaders:
-          - Content-Type
-          - Authorization
-          - X-Requested-With
-
-  # 3. Main Agentic Backend Function
+        AllowOrigins: ['http://localhost:3000']
+        AllowMethods: [GET, POST, PUT, OPTIONS]
+        AllowHeaders: [Content-Type, Authorization]
+  ApiAccessLogs:
+    Type: AWS::Logs::LogGroup
+    Properties: {RetentionInDays: 14}
+  ApiStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref WellyncHttpApi
+      StageName: $default
+      AutoDeploy: true
+      DefaultRouteSettings: {ThrottlingBurstLimit: 20, ThrottlingRateLimit: 10}
+      AccessLogSettings:
+        DestinationArn: !GetAtt ApiAccessLogs.Arn
+        Format: '{"requestId":"$context.requestId","routeKey":"$context.routeKey","status":"$context.status","responseLength":"$context.responseLength"}'
+  # Administrator-created accounts; roles/patient assignments live only in DynamoDB.
+  # OTP adds Essentials + verified SES sending; preserve pool ID and all subject mappings.
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      UserPoolTier: !If [UseEmailOtp, ESSENTIALS, LITE]
+      EmailConfiguration: !If
+        - UseEmailOtp
+        - EmailSendingAccount: DEVELOPER
+          SourceArn: !Sub 'arn:${AWS::Partition}:ses:${AWS::Region}:${AWS::AccountId}:identity/${CognitoSenderEmail}'
+          From: !Ref CognitoSenderEmail
+        - !Ref AWS::NoValue
+      AdminCreateUserConfig: {AllowAdminCreateUserOnly: true}
+      UsernameAttributes: [email]
+      AutoVerifiedAttributes: [email]
+      MfaConfiguration: OPTIONAL
+      EnabledMfas: [SOFTWARE_TOKEN_MFA]
+      Policies:
+        SignInPolicy: !If [UseEmailOtp, {AllowedFirstAuthFactors: [PASSWORD, EMAIL_OTP]}, !Ref 'AWS::NoValue']
+        PasswordPolicy: {MinimumLength: 12, RequireLowercase: true, RequireUppercase: true, RequireNumbers: true, RequireSymbols: true, TemporaryPasswordValidityDays: 3}
+      AccountRecoverySetting:
+        RecoveryMechanisms: [{Name: verified_email, Priority: 1}]
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      UserPoolId: !Ref UserPool
+      GenerateSecret: false
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthFlows: [code]
+      AllowedOAuthScopes: [openid, email, profile]
+      SupportedIdentityProviders: [COGNITO]
+      CallbackURLs: [!Sub 'https://${WellyncHttpApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}/auth/callback/', 'http://localhost:3000/auth/callback/']
+      LogoutURLs: [!Sub 'https://${WellyncHttpApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}/login/', 'http://localhost:3000/login/']
+      AccessTokenValidity: 15
+      IdTokenValidity: 15
+      TokenValidityUnits: {AccessToken: minutes, IdToken: minutes, RefreshToken: days}
+      EnableTokenRevocation: true
+      PreventUserExistenceErrors: ENABLED
+      ExplicitAuthFlows: !If [UseEmailOtp, [ALLOW_USER_AUTH, ALLOW_REFRESH_TOKEN_AUTH], [ALLOW_REFRESH_TOKEN_AUTH]]
+  # Keep OAuth code + PKCE and openid-scoped tokens; the hosted service handles OTP challenges.
+  UserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties: {Domain: !Ref CognitoDomainPrefix, UserPoolId: !Ref UserPool, ManagedLoginVersion: !If [UseEmailOtp, 2, 1]}
+  # Programmatically created clients need a branding style to use managed login version 2.
+  OtpLoginBranding:
+    Type: AWS::Cognito::ManagedLoginBranding
+    Condition: UseEmailOtp
+    DependsOn: UserPoolDomain
+    Properties:
+      UserPoolId: !Ref UserPool
+      ClientId: !Ref UserPoolClient
+      UseCognitoProvidedValues: true
+  JwtAuthorizer:
+    Type: AWS::ApiGatewayV2::Authorizer
+    Properties:
+      ApiId: !Ref WellyncHttpApi
+      Name: cognito-access-token
+      AuthorizerType: JWT
+      IdentitySource: ['$request.header.Authorization']
+      JwtConfiguration:
+        Audience: [!Ref UserPoolClient]
+        Issuer: !Sub 'https://cognito-idp.${AWS::Region}.${AWS::URLSuffix}/${UserPool}'
+  # Keep the previous SAM-generated logical IDs and purpose-specific runtime policies.
+  # template-existing-roles.yaml omits these resources for externally administered roles.
+  WellyncBackendFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: {Service: lambda.amazonaws.com}
+            Action: sts:AssumeRole
+      ManagedPolicyArns: [!Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole']
+      Policies:
+        - PolicyName: ScopedBackendRuntime
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: [dynamodb:GetItem, dynamodb:PutItem, dynamodb:Query, dynamodb:UpdateItem, dynamodb:DeleteItem, dynamodb:ConditionCheckItem]
+                Resource: !GetAtt HealthcareAgentTable.Arn
+              - Effect: Allow
+                Action: [bedrock:InvokeModel]
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:bedrock:${AWS::Region}::foundation-model/amazon.nova-micro-v1:0'
+                  - !Sub 'arn:${AWS::Partition}:bedrock:${AWS::Region}::foundation-model/amazon.nova-lite-v1:0'
+  FrontendFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: {Service: lambda.amazonaws.com}
+            Action: sts:AssumeRole
+      ManagedPolicyArns: [!Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole']
+      Policies:
+        - PolicyName: ScopedFrontendRuntime
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: [s3:GetObject]
+                Resource: !Sub '${FrontendBucket.Arn}/*'
+              - Effect: Allow
+                Action: [s3:ListBucket]
+                Resource: !GetAtt FrontendBucket.Arn
+  # No Scan permission, no unbounded Bedrock wildcard or cross-region profiles.
   WellyncBackendFunction:
     Type: AWS::Serverless::Function
+    Metadata: {BuildMethod: makefile}
     Properties:
       CodeUri: ./
       Handler: dist/handler.handler
+      Role: !GetAtt WellyncBackendFunctionRole.Arn
       Environment:
         Variables:
           DYNAMODB_TABLE: !Ref HealthcareAgentTable
-          BEDROCK_CHEAP_MODEL: amazon.nova-micro-v1:0
-          AWS_NODEJS_CONNECTION_REUSE_ENABLED: '1'
-      Policies:
-        # Permission to Invoke Amazon Bedrock Models
-        - Statement:
-            - Effect: Allow
-              Action:
-                - bedrock:InvokeModel
-              Resource: '*'
-        # Permission for DynamoDB Single-Table
-        - DynamoDBCrudPolicy:
-            TableName: !Ref HealthcareAgentTable
-      Events:
-        ProxyApi:
-          Type: HttpApi
-          Properties:
-            ApiId: !Ref WellyncHttpApi
-            Path: /{proxy+}
-            Method: ANY
-        RootApi:
-          Type: HttpApi
-          Properties:
-            ApiId: !Ref WellyncHttpApi
-            Path: /
-            Method: ANY
-
+          AI_ENABLED: !Ref AIEnabled
+          BEDROCK_MODEL: !Ref BedrockModel
+          BEDROCK_VISION_MODEL: !Ref BedrockVisionModel
+          AI_USER_DAILY_UNITS: !Ref AIUserDailyUnits
+          AI_GLOBAL_DAILY_UNITS: !Ref AIGlobalDailyUnits
+          AI_REQUESTS_PER_MINUTE: '6'
+  BackendLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${WellyncBackendFunction}'
+      RetentionInDays: 14
+  FrontendFunction:
+    Type: AWS::Serverless::Function
+    Metadata: {BuildMethod: makefile}
+    Properties:
+      CodeUri: ./
+      Handler: dist/staticHandler.handler
+      Timeout: 10
+      MemorySize: 256
+      Role: !GetAtt FrontendFunctionRole.Arn
+      Environment:
+        Variables: {FRONTEND_BUCKET: !Ref FrontendBucket, COGNITO_DOMAIN: !Sub 'https://${CognitoDomainPrefix}.auth.${AWS::Region}.amazoncognito.com'}
+  FrontendLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${FrontendFunction}'
+      RetentionInDays: 14
+  BackendIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties: {ApiId: !Ref WellyncHttpApi, IntegrationType: AWS_PROXY, IntegrationUri: !GetAtt WellyncBackendFunction.Arn, PayloadFormatVersion: '2.0', TimeoutInMillis: 29000}
+  FrontendIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties: {ApiId: !Ref WellyncHttpApi, IntegrationType: AWS_PROXY, IntegrationUri: !GetAtt FrontendFunction.Arn, PayloadFormatVersion: '2.0'}
+  ApiRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref WellyncHttpApi
+      RouteKey: 'ANY /api/{proxy+}'
+      Target: !Sub 'integrations/${BackendIntegration}'
+      AuthorizationType: JWT
+      AuthorizerId: !Ref JwtAuthorizer
+      AuthorizationScopes: [openid]
+  HealthRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties: {ApiId: !Ref WellyncHttpApi, RouteKey: 'GET /api/health', Target: !Sub 'integrations/${BackendIntegration}', AuthorizationType: NONE}
+  FrontendRootRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties: {ApiId: !Ref WellyncHttpApi, RouteKey: 'GET /', Target: !Sub 'integrations/${FrontendIntegration}', AuthorizationType: NONE}
+  FrontendRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties: {ApiId: !Ref WellyncHttpApi, RouteKey: 'GET /{proxy+}', Target: !Sub 'integrations/${FrontendIntegration}', AuthorizationType: NONE}
+  BackendPermission:
+    Type: AWS::Lambda::Permission
+    Properties: {FunctionName: !Ref WellyncBackendFunction, Action: 'lambda:InvokeFunction', Principal: apigateway.amazonaws.com, SourceAccount: !Ref 'AWS::AccountId', SourceArn: !Sub 'arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${WellyncHttpApi}/*/*/api/*'}
+  FrontendPermission:
+    Type: AWS::Lambda::Permission
+    Properties: {FunctionName: !Ref FrontendFunction, Action: 'lambda:InvokeFunction', Principal: apigateway.amazonaws.com, SourceAccount: !Ref 'AWS::AccountId', SourceArn: !Sub 'arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${WellyncHttpApi}/*/GET/*'}
+  BackendErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Backend errors - inspect CloudWatch; no notification destination configured
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions: [{Name: FunctionName, Value: !Ref WellyncBackendFunction}]
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 3
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
 Outputs:
+  BackendFunctionName: {Value: !Ref WellyncBackendFunction}
+  FrontendFunctionName: {Value: !Ref FrontendFunction}
+  BackendExecutionRoleArn: {Value: !GetAtt WellyncBackendFunctionRole.Arn}
+  FrontendExecutionRoleArn: {Value: !GetAtt FrontendFunctionRole.Arn}
   ApiEndpoint:
-    Description: "HTTP API Gateway endpoint URL ($0 Base Cost)"
-    Value: !Sub "https://${WellyncHttpApi}.execute-api.${AWS::Region}.amazonaws.com"
-  DynamoDBTableName:
-    Description: "DynamoDB Single-Table Name"
-    Value: !Ref HealthcareAgentTable
+    Value: !Sub 'https://${WellyncHttpApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}'
+  FrontendBucketName: {Value: !Ref FrontendBucket}
+  DynamoDBTableName: {Value: !Ref HealthcareAgentTable}
+  CognitoUserPoolId: {Value: !Ref UserPool}
+  CognitoClientId: {Value: !Ref UserPoolClient}
+  CognitoDomain: {Value: !Sub 'https://${CognitoDomainPrefix}.auth.${AWS::Region}.amazoncognito.com'}

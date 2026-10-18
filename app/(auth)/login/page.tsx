@@ -9,6 +9,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/hooks/use-auth";
 
+import { isAwsMode } from "@/lib/runtime";
+import { beginSignIn } from "@/lib/services/cloud-auth";
+import { useState } from "react";
+
 const schema = z.object({
   email: z.string().email("กรุณาใส่อีเมลให้ถูกต้อง"),
   password: z.string().min(4, "รหัสผ่านอย่างน้อย 4 ตัวอักษร")
@@ -17,6 +21,7 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>;
 
 export default function LoginPage() {
+  const [cloudError, setCloudError] = useState("");
   const { login } = useAuth();
   const {
     register,
@@ -27,6 +32,11 @@ export default function LoginPage() {
     resolver: zodResolver(schema),
     defaultValues: { email: "patient@gmail.com", password: "demo1234" }
   });
+
+  if (isAwsMode) {
+    const emailOtp = process.env.NEXT_PUBLIC_AUTH_METHOD === "email_otp";
+    return <AuthCard title="เข้าสู่ระบบ WELLYNC" subtitle={emailOtp ? "ใช้อีเมลที่ผู้ดูแลลงทะเบียนไว้ แล้วเลือกเข้าสู่ระบบด้วยรหัสทางอีเมล" : "เข้าสู่ระบบด้วยบัญชีที่ผู้ดูแลกำหนดสิทธิ์ให้"} footer={<span>สร้างบัญชีใหม่: ติดต่อผู้ดูแลระบบ</span>}><Button className="w-full" onClick={() => { void beginSignIn().catch(e => setCloudError(e.message)); }}>{emailOtp ? "เข้าสู่ระบบด้วยรหัส OTP ทางอีเมล" : "เข้าสู่ระบบด้วย Amazon Cognito"}</Button>{cloudError && <p role="alert" className="text-red-600">{cloudError}</p>}</AuthCard>;
+  }
 
   return (
     <AuthCard

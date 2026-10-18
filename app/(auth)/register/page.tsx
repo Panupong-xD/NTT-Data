@@ -785,14 +785,14 @@ function CustomDatePicker({ value, onChange, label }: CustomDatePickerProps) {
     setIsOpen(false);
   };
 
-  const formattedDisplayDate = useMemo(() => {
+  const formattedDisplayDate = (() => {
     if (!value) return "";
     const parts = value.split("-");
     const y = Number(parts[0]) + 543; // Thai Buddhist Era (พ.ศ.)
     const m = monthsTH[Number(parts[1]) - 1];
     const d = Number(parts[2]);
     return `${d} ${m} ${y}`;
-  }, [value]);
+  })();
 
   const handleOpen = () => {
     setView("year");

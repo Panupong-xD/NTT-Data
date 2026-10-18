@@ -18,7 +18,7 @@ export function getRoleFromEmail(email: string): UserRole {
 export function readMockUser(): AppUser | null {
   if (typeof window === "undefined") return null;
   const raw = localStorage.getItem("mock-auth-user");
-  return raw ? (JSON.parse(raw) as AppUser) : null;
+  try { return raw ? (JSON.parse(raw) as AppUser) : null; } catch { return null; }
 }
 
 export function loginWithEmail(email: string): AppUser {
