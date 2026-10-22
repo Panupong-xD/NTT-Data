@@ -5,9 +5,12 @@ import { cloudRequest } from "@/lib/services/cloud-auth";
 
 export async function askAI(content: string, files?: Array<{ type: string; name: string; data: string }>, options?: { sessionId?: string; patientId?: string; isCritical?: boolean }) {
   if (!isAwsMode) throw new Error("AI ใช้ได้ในโหมด AWS หลังตั้งค่า Cognito และ Bedrock เท่านั้น");
-  const payload = await cloudRequest<{ text: string }>("/api/ai/chat", {
+  const payload = await cloudRequest<{ text: unknown }>("/api/ai/chat", {
     method: "POST", body: JSON.stringify({ content, files: files?.length ? files : undefined, sessionId: options?.sessionId || "main", patientId: options?.patientId })
   });
+  if (typeof payload?.text !== "string" || !payload.text.trim()) {
+    throw new Error("AI ส่งคำตอบในรูปแบบที่ไม่รองรับ กรุณาลองอีกครั้ง");
+  }
   return payload.text;
 }
 export async function getApprovals(statusFilter = "ALL"): Promise<ApprovalEntity[]> {

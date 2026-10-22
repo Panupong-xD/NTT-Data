@@ -40,7 +40,7 @@ Parameters:
   BedrockModel:
     Type: String
     Default: amazon.nova-micro-v1:0
-    AllowedValues: [amazon.nova-micro-v1:0, amazon.nova-lite-v1:0]
+    AllowedValues: [amazon.nova-micro-v1:0, amazon.nova-lite-v1:0, qwen.qwen3-next-80b-a3b]
   BedrockVisionModel:
     Type: String
     Default: ''

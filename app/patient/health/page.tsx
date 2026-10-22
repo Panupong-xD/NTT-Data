@@ -16,6 +16,7 @@ import { addHealthRecord, deleteHealthRecord } from "@/lib/services/mock-store";
 import { askAI } from "@/lib/services/ai/client";
 import { formatThaiDate } from "@/lib/utils";
 import { MarkdownRenderer } from "@/components/ui/markdown-renderer";
+import { parseFoodAnalysis, type FoodAnalysis } from "@/lib/food-analysis";
 import { isAwsMode } from "@/lib/runtime";
 import { useAuth } from "@/lib/hooks/use-auth";
 import { GlucoseTiming, glucoseStatus, glucoseTimingLabels } from "@/lib/health-status";
@@ -82,18 +83,6 @@ export default function PatientHealthPage() {
     sleepHours: 7.5,
     confirmationStatus: "confirmed"
   };
-
-  interface FoodAnalysis {
-    name: string;
-    calories: string;
-    protein: string;
-    carbs: string;
-    fat: string;
-    sugar: string;
-    sodium: string;
-    score: string;
-    recommendation: string;
-  }
 
   const [activeTab, setActiveTab] = useState("records");
   useEffect(() => {
@@ -526,16 +515,9 @@ export default function PatientHealthPage() {
 
       const answer = await askAI(prompt, filesArray);
 
-      let cleanJson = answer.trim();
-      const jsonMatch = cleanJson.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        cleanJson = jsonMatch[0];
-      }
-
-      const data = JSON.parse(cleanJson) as FoodAnalysis;
-      setFoodAnalysis(data);
+      setFoodAnalysis(parseFoodAnalysis(answer));
     } catch (error) {
-      console.error("Failed parsing food scanner JSON:", error);
+      toast.error(error instanceof Error ? error.message : "ยังวิเคราะห์อาหารไม่ได้ กรุณาลองอีกครั้ง");
       setFoodAnalysis({
         name: name,
         calories: "ไม่ระบุ",

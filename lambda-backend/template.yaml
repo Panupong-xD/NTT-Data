@@ -30,7 +30,7 @@ Parameters:
   BedrockModel:
     Type: String
     Default: amazon.nova-micro-v1:0
-    AllowedValues: [amazon.nova-micro-v1:0, amazon.nova-lite-v1:0]
+    AllowedValues: [amazon.nova-micro-v1:0, amazon.nova-lite-v1:0, qwen.qwen3-next-80b-a3b]
   BedrockVisionModel:
     Type: String
     Default: ''
@@ -225,6 +225,7 @@ Resources:
                 Resource:
                   - !Sub 'arn:${AWS::Partition}:bedrock:${AWS::Region}::foundation-model/amazon.nova-micro-v1:0'
                   - !Sub 'arn:${AWS::Partition}:bedrock:${AWS::Region}::foundation-model/amazon.nova-lite-v1:0'
+                  - !Sub 'arn:${AWS::Partition}:bedrock:${AWS::Region}::foundation-model/qwen.qwen3-next-80b-a3b'
   FrontendFunctionRole:
     Type: AWS::IAM::Role
     Properties:

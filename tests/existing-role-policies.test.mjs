@@ -20,6 +20,14 @@ test("AI permission is generated only when enabled and stays in-region",()=>{
  stack.Parameters[1].ParameterValue="us.amazon.nova-micro-v1:0";
  assert.throws(()=>runtimePolicies(stack,"us-east-1"),/Unexpected model/);
 });
+test("Qwen chat permission is exact and does not make a text-only model valid for vision",()=>{
+ const stack=fixture(); stack.Parameters[0].ParameterValue="true"; stack.Parameters[1].ParameterValue="qwen.qwen3-next-80b-a3b";
+ stack.Parameters.push({ParameterKey:"BedrockVisionModel",ParameterValue:"amazon.nova-lite-v1:0"});
+ const policy=runtimePolicies(stack,"us-east-1").backend.policy;
+ assert.deepEqual(policy.Statement[2].Resource,["arn:aws:bedrock:us-east-1::foundation-model/qwen.qwen3-next-80b-a3b","arn:aws:bedrock:us-east-1::foundation-model/amazon.nova-lite-v1:0"]);
+ stack.Parameters[2].ParameterValue="qwen.qwen3-next-80b-a3b";
+ assert.throws(()=>runtimePolicies(stack,"us-east-1"),/Unexpected model/);
+});
 test("reject same/foreign roles, incomplete stack and incorrect region",()=>{
  const stack=fixture();stack.Outputs[1].OutputValue=stack.Outputs[0].OutputValue;assert.throws(()=>runtimePolicies(stack,"us-east-1"),/separate/);
  const foreign=fixture();foreign.Outputs[0].OutputValue="arn:aws:iam::111111111111:role/backend";assert.throws(()=>runtimePolicies(foreign,"us-east-1"),/foreign role/);

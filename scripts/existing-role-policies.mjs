@@ -4,7 +4,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 const allowedRegions = ["us-east-1", "ap-southeast-1", "ap-southeast-7"];
-const allowedModels = ["amazon.nova-micro-v1:0", "amazon.nova-lite-v1:0"];
+const allowedModels = ["amazon.nova-micro-v1:0", "amazon.nova-lite-v1:0", "qwen.qwen3-next-80b-a3b"];
 export function runtimePolicies(stack, region) {
   if (!allowedRegions.includes(region)) throw new Error("Region is not permitted");
   if (!["CREATE_COMPLETE", "UPDATE_COMPLETE", "UPDATE_ROLLBACK_COMPLETE"].includes(stack.StackStatus)) throw new Error("Stack must be successfully deployed before generating runtime policies");
@@ -33,7 +33,7 @@ export function runtimePolicies(stack, region) {
   }];
   if (params.AIEnabled === "true") {
     const models = [...new Set([params.BedrockModel, params.BedrockVisionModel].filter(Boolean))];
-    if (!models.length || models.some(m => !allowedModels.includes(m))) throw new Error("Unexpected model or cross-region inference profile");
+    if (!models.length || models.some(m => !allowedModels.includes(m)) || (params.BedrockVisionModel && params.BedrockVisionModel !== "amazon.nova-lite-v1:0")) throw new Error("Unexpected model or cross-region inference profile");
     backend.push({ Effect: "Allow", Action: ["bedrock:InvokeModel"], Resource: models.map(m => `arn:aws:bedrock:${region}::foundation-model/${m}`) });
   }
   const frontend = [logging("FrontendFunctionName"),

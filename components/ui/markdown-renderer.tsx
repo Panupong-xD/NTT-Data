@@ -1,7 +1,7 @@
 import React from "react";
 
 export function MarkdownRenderer({ content }: { content: string }) {
-  if (!content) return null;
+  if (typeof content !== "string" || !content) return null;
 
   const lines = content.split("\n");
   const renderedElements: React.ReactNode[] = [];
