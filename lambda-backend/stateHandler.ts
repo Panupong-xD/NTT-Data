@@ -79,7 +79,7 @@ export async function handleGetState(identity: Identity) {
       db.patients.push((allowed ? clean(patient) : { id: patient.id, name: patient.name, hospital: patient.hospital, doctorId: identity.entityId, caregiverId: "", citizenId: "", age: 0, gender: "", diagnosis: [], allergies: [], medications: [], email: "", healthScore: null }) as any);
     }
     for (const collection of ["healthRecords", "carePlans", "notifications", "consents", "caregivers"] as const) {
-      const rows = items.filter(i => i.SK.startsWith(prefix[collection]));
+      const rows = items.filter(i => i.SK.startsWith(prefix[collection]) && (collection !== "carePlans" || i.status === "published" || i.status === "approved"));
       const visible = collection === "consents" ? rows.filter(i => identity.role !== "doctor" || i.doctorId === identity.entityId) : allowed ? rows : [];
       (db[collection] as any[]).push(...visible.filter(i => collection !== "notifications" || i.userRole === identity.role).map(clean));
     }
@@ -89,6 +89,7 @@ export async function handleGetState(identity: Identity) {
     if (doctor) db.doctors.push(clean(doctor) as any);
   }
   db.healthRecords.sort((a, b) => a.date.localeCompare(b.date));
+  db.carePlans.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   db.notifications.sort((a, b) => b.date.localeCompare(a.date));
   return { db };
 }

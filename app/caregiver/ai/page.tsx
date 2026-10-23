@@ -4,6 +4,7 @@ import Link from "next/link";
 import { HeartHandshake } from "lucide-react";
 import { MobileShell } from "@/components/layouts/mobile-shell";
 import { MockChat } from "@/components/chat/mock-chat";
+import { PatientMemoryPanel } from "@/components/health/patient-memory";
 import { useMockStore } from "@/lib/hooks/use-mock-store";
 
 import { useAuth } from "@/lib/hooks/use-auth";
@@ -22,6 +23,7 @@ export default function CaregiverAiPage() {
         patientId={patient.id}
         mode="caregiver"
       />
+      <PatientMemoryPanel patientId={patient.id} role="caregiver" />
       <Link href="/caregiver/burnout" className="flex min-h-14 items-center gap-3 px-1"><HeartHandshake className="h-5 w-5 text-emerald-600"/><span className="flex-1 text-sm font-medium">อยากพักใจ แวะตรงนี้ได้</span><span className="text-sky-600">↗</span></Link>
     </MobileShell>
   );

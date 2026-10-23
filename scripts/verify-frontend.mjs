@@ -18,11 +18,12 @@ async function get(path) {
 }
 const html = await get('/patient/health/');
 const localHtml = readFileSync('out/patient/health/index.html', 'utf8');
-const rendererPattern = /src="([^" ]*\/580-[^" ]+\.js)"/;
-const expected = localHtml.match(rendererPattern)?.[1];
-if (!expected || html.match(rendererPattern)?.[1] !== expected) throw new Error('Deployed food page does not reference this build');
+const scripts = source => [...source.matchAll(/<script[^>]+src="([^"]+)"/g)].map(match => match[1]).sort();
+if (JSON.stringify(scripts(html)) !== JSON.stringify(scripts(localHtml))) throw new Error('Deployed food page does not reference this build');
+const expected = scripts(localHtml).find(path => path.includes('/app/patient/health/page-'));
+if (!expected) throw new Error('Food page bundle missing');
 const actual = await get(expected);
 const hash = text => createHash('sha256').update(text).digest('hex');
 if (hash(actual) !== hash(readFileSync(`out${expected}`, 'utf8'))) throw new Error('Deployed renderer differs from this build');
-console.log(`Verified food renderer: ${expected.split('/').pop()}`);
-console.log('Deployed food page and renderer match this build.');
+console.log(`Verified food page: ${expected.split('/').pop()}`);
+console.log('Deployed food page and JavaScript references match this build.');

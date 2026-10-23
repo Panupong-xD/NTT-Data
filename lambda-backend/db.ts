@@ -25,7 +25,7 @@ export async function queryItems(PK: string, prefix: string, limit = 100) {
 }
 export const ttl = () => Math.floor(Date.now() / 1000) + 30 * 86400;
 
-export async function reserveAIUsage(sub: string, units: number) {
+export async function reserveAIUsage(sub: string, units: number, countRequest = true) {
   const day = new Date().toISOString().slice(0, 10); // UTC accounting windows
   const minute = Math.floor(Date.now() / 60000);
   const userLimit = Number(process.env.AI_USER_DAILY_UNITS || 200000);
@@ -35,7 +35,7 @@ export async function reserveAIUsage(sub: string, units: number) {
   try {
     await docClient.send(new TransactWriteCommand({
       TransactItems: [
-        { key: `RATE#${sub}#${minute}`, amount: 1, limit: maxPerMinute },
+        ...(countRequest ? [{ key: `RATE#${sub}#${minute}`, amount: 1, limit: maxPerMinute }] : []),
         { key: `BUDGET#${sub}#${day}`, amount: units, limit: userLimit },
         { key: `BUDGET#GLOBAL#${day}`, amount: units, limit: globalLimit }
       ].map(({ key, amount, limit }) => ({ Update: {
@@ -61,8 +61,8 @@ export async function recentMessages(owner: string, patientId: string, sessionId
   // TTL removal is asynchronous: expired records must be excluded at read time.
   return (result.Items || []).filter(item => item.ttl > Date.now() / 1000).reverse();
 }
-export async function saveTurn(owner: string, patientId: string, sessionId: string, user: string, assistant: string) {
-  await putItem({ PK: `CHAT#${owner}#${patientId}#${sessionId}`, SK: `TURN#${new Date().toISOString()}#${randomUUID()}`, user, assistant, ttl: ttl() });
+export async function saveTurn(owner: string, patientId: string, sessionId: string, user: string, assistant: string, contextVersion?: string) {
+  await putItem({ PK: `CHAT#${owner}#${patientId}#${sessionId}`, SK: `TURN#${new Date().toISOString()}#${randomUUID()}`, user, assistant, contextVersion, ttl: ttl() });
 }
 
 export async function decideApproval(patientId: string, actionId: string, decision: string, reviewer: string, note?: string) {

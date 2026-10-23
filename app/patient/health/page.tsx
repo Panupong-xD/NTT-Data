@@ -17,6 +17,7 @@ import { askAI } from "@/lib/services/ai/client";
 import { formatThaiDate } from "@/lib/utils";
 import { MarkdownRenderer } from "@/components/ui/markdown-renderer";
 import { parseFoodAnalysis, type FoodAnalysis } from "@/lib/food-analysis";
+import { MealConfirmation, ManualMealButton, PatientMemoryPanel } from "@/components/health/patient-memory";
 import { isAwsMode } from "@/lib/runtime";
 import { useAuth } from "@/lib/hooks/use-auth";
 import { GlucoseTiming, glucoseStatus, glucoseTimingLabels } from "@/lib/health-status";
@@ -92,6 +93,7 @@ export default function PatientHealthPage() {
   const [scannerReady, setScannerReady] = useState(false);
   const [scannerLoading, setScannerLoading] = useState(false);
   const [foodAnalysis, setFoodAnalysis] = useState<FoodAnalysis | null>(null);
+  const [foodAnalysisValid, setFoodAnalysisValid] = useState(false);
   const [foodImage, setFoodImage] = useState<string | null>(null);
   const [foodNameInput, setFoodNameInput] = useState("");
   const [foodFilesPayload, setFoodFilesPayload] = useState<Array<{ type: string; name: string; data: string }>>([]);
@@ -194,7 +196,7 @@ export default function PatientHealthPage() {
         }, null, 2)
       ].join("\n");
 
-      const answer = await askAI(prompt, filesArray);
+      const answer = await askAI(prompt, filesArray, { purpose: "analysis" });
 
       let cleanJson = answer.trim();
       const jsonMatch = cleanJson.match(/\{[\s\S]*\}/);
@@ -364,7 +366,7 @@ export default function PatientHealthPage() {
 
       let answer = "";
       try {
-        answer = await askAI(prompt, filesArray);
+        answer = await askAI(prompt, filesArray, { purpose: "analysis" });
       } catch (networkError) {
         if (isAwsMode) throw networkError;
         console.warn("Demo scanner failed");
@@ -494,6 +496,7 @@ export default function PatientHealthPage() {
   async function runFoodAnalysis(name: string, filesArray?: Array<{ type: string; name: string; data: string }>) {
     setScannerLoading(true);
     setFoodAnalysis(null);
+    setFoodAnalysisValid(false);
     try {
       const prompt = [
         "บทบาท: คุณคือ AI วิเคราะห์สารอาหาร (Food Scanner) ในแอปพลิเคชันสำหรับผู้ป่วยเบาหวานชนิดที่ 2 และความดันโลหิตสูง",
@@ -513,9 +516,10 @@ export default function PatientHealthPage() {
         }, null, 2)
       ].join("\n");
 
-      const answer = await askAI(prompt, filesArray);
+      const answer = await askAI(prompt, filesArray, { purpose: "analysis" });
 
       setFoodAnalysis(parseFoodAnalysis(answer));
+      setFoodAnalysisValid(true);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "ยังวิเคราะห์อาหารไม่ได้ กรุณาลองอีกครั้ง");
       setFoodAnalysis({
@@ -561,8 +565,9 @@ export default function PatientHealthPage() {
           <section className="relative overflow-hidden rounded-[30px_30px_40px_24px] bg-[#e6f3eb] p-5"><h2 className="relative z-10 text-2xl font-bold leading-9 text-emerald-900">มื้อนี้<br/>กินอะไรดี?</h2><p className="relative z-10 mt-2 text-xs text-emerald-700">ให้ผู้ช่วยดูสารอาหารให้</p><HealthCharm mood="meal" className="mobile-float absolute -right-2 bottom-0 h-32 w-32"/></section>
           <section className="care-sheet p-5"><div className="grid grid-cols-2 gap-2"><button type="button" onClick={()=>setIsFoodCameraOpen(true)} className="flex min-h-[70px] items-center justify-center gap-2 rounded-[20px] bg-sky-50 text-sm font-medium text-sky-800"><Camera className="h-5 w-5"/>ถ่ายรูปอาหาร</button><label className="flex min-h-[70px] cursor-pointer items-center justify-center gap-2 rounded-[20px] bg-[#fff0da] text-sm font-medium text-amber-800"><Upload className="h-5 w-5"/>เลือกรูป<input type="file" className="sr-only" aria-label="เลือกรูปอาหาร" accept="image/*" onChange={handleFileChange}/></label></div>
           {foodImage&&<img src={foodImage} alt="อาหารที่เลือก" className="mt-4 max-h-48 w-full rounded-2xl object-contain"/>}
-          <form className="mt-4 space-y-3" onSubmit={e=>{e.preventDefault();if(foodNameInput.trim()){setScannerReady(true);runFoodAnalysis(foodNameInput,foodFilesPayload);}}}><label htmlFor="food-name" className="mobile-form-label">หรือพิมพ์ชื่อเมนู</label><Input id="food-name" placeholder="เช่น ข้าวกะเพราไข่ดาว" value={foodNameInput} onChange={e=>setFoodNameInput(e.target.value)} disabled={scannerLoading}/><Button className="h-12 w-full rounded-full" disabled={scannerLoading||!foodNameInput.trim()}>{scannerLoading?<Loader2 className="h-4 w-4 animate-spin"/>:<Utensils className="h-4 w-4"/>}{scannerLoading?"กำลังดูสารอาหาร…":"ดูสารอาหาร"}</Button></form></section>
-          {scannerReady&&foodAnalysis&&!scannerLoading&&<section className="care-sheet p-5"><h3 className="mobile-section-title">{foodAnalysis.name}</h3><p className="mt-2 text-[30px] font-bold text-sky-700">{foodAnalysis.calories}</p><dl className="mt-5 grid grid-cols-2 gap-x-4 gap-y-3 border-t border-slate-100 pt-4">{[["โปรตีน",foodAnalysis.protein],["คาร์โบไฮเดรต",foodAnalysis.carbs],["ไขมัน",foodAnalysis.fat],["น้ำตาล",foodAnalysis.sugar],["โซเดียม",foodAnalysis.sodium],["คะแนนโภชนาการ",foodAnalysis.score]].map(([label,value])=><div key={label}><dt className="text-xs text-slate-500">{label}</dt><dd className="mt-1 text-sm font-semibold">{value}</dd></div>)}</dl><div className="mt-5 border-t border-slate-100 pt-4 text-sm leading-7 text-slate-600"><MarkdownRenderer content={foodAnalysis.recommendation}/></div></section>}
+          <form className="mt-4 space-y-3" onSubmit={e=>{e.preventDefault();if(foodNameInput.trim()){setScannerReady(true);runFoodAnalysis(foodNameInput,foodFilesPayload);}}}><label htmlFor="food-name" className="mobile-form-label">หรือพิมพ์ชื่อเมนู</label><Input id="food-name" placeholder="เช่น ข้าวกะเพราไข่ดาว" value={foodNameInput} onChange={e=>setFoodNameInput(e.target.value)} disabled={scannerLoading}/><Button className="h-12 w-full rounded-full" disabled={scannerLoading||!foodNameInput.trim()}>{scannerLoading?<Loader2 className="h-4 w-4 animate-spin"/>:<Utensils className="h-4 w-4"/>}{scannerLoading?"กำลังดูสารอาหาร…":"ดูสารอาหาร"}</Button></form>{!foodImage && !scannerLoading && <ManualMealButton name={foodNameInput} patientId={patient.id} />}</section>
+          {scannerReady&&foodAnalysis&&!scannerLoading&&<section className="care-sheet p-5"><h3 className="mobile-section-title">{foodAnalysis.name}</h3><p className="mt-2 text-[30px] font-bold text-sky-700">{foodAnalysis.calories}</p><dl className="mt-5 grid grid-cols-2 gap-x-4 gap-y-3 border-t border-slate-100 pt-4">{[["โปรตีน",foodAnalysis.protein],["คาร์โบไฮเดรต",foodAnalysis.carbs],["ไขมัน",foodAnalysis.fat],["น้ำตาล",foodAnalysis.sugar],["โซเดียม",foodAnalysis.sodium],["คะแนนโภชนาการ",foodAnalysis.score]].map(([label,value])=><div key={label}><dt className="text-xs text-slate-500">{label}</dt><dd className="mt-1 text-sm font-semibold">{value}</dd></div>)}</dl><div className="mt-5 border-t border-slate-100 pt-4 text-sm leading-7 text-slate-600"><MarkdownRenderer content={foodAnalysis.recommendation}/></div>{foodAnalysisValid && <MealConfirmation analysis={foodAnalysis} patientId={patient.id} fromImage={foodFilesPayload.length > 0} />}</section>}
+          <PatientMemoryPanel patientId={patient.id} role="patient" />
         </TabsContent>
         <TabsContent value="ai"><MockChat title="เพื่อนสุขภาพ" seedMessages={db.chatHistory?.patient} patientId={patient.id} mode="patient"/></TabsContent>
       </Tabs>

@@ -7,6 +7,7 @@ import { HealthPassport } from "@/components/health/health-passport";
 import { MobileShell } from "@/components/layouts/mobile-shell";
 import { useAuth } from "@/lib/hooks/use-auth";
 import { useMockStore } from "@/lib/hooks/use-mock-store";
+import { PatientMemoryPanel } from "@/components/health/patient-memory";
 
 export default function PatientProfilePage() {
   const { logout, user } = useAuth();
@@ -36,6 +37,7 @@ export default function PatientProfilePage() {
       <HeartHandshake className="mt-1 h-6 w-6 shrink-0 text-sky-600" />
       <div><h3 className="text-xs font-medium text-slate-500">คนที่ช่วยดูแลคุณ</h3><p className="mt-1 text-base font-bold text-slate-800">{caregiver?.name || "ยังไม่มีผู้ดูแลที่เชื่อมต่อ"}</p>{caregiver && <p className="mt-1 text-sm leading-6 text-slate-500">{caregiver.relationship}</p>}</div>
     </section>
+    <PatientMemoryPanel patientId={patient.id} role="patient" preferences meals={false} />
     <Button variant="ghost" className="min-h-12 w-full gap-2 text-rose-600 hover:bg-rose-50 hover:text-rose-700" onClick={logout}><LogOut className="h-4 w-4" />ออกจากระบบ</Button>
   </MobileShell>;
 }

@@ -187,6 +187,8 @@ export interface ChatMessage {
   time: string;
   planningSteps?: string[];
   agentAction?: AgentAction;
+  actionDraft?: import("./services/patient-memory").AssistantDraft;
+  contextSource?: import("./services/patient-memory").ContextSource;
 }
 
 export interface MockDatabase {

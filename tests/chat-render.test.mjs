@@ -14,9 +14,11 @@ const ui = dataUrl(`import {createElement} from ${react};
   export const Button=box, Input=box, HealthCharm=box;
   export const Loader2=box,Send=box,CheckCircle2=box,ChevronDown=box;
   export const MarkdownRenderer=({content})=>createElement('p',null,content);
+  export const AssistantDraftCard=box;
   export const toast={success(){},info(){}};
   export const isAwsMode=true;
   export async function askAI(){throw new Error('No network in render test');}
+  export async function askAssistant(){throw new Error('No network in render test');}
   export async function submitAgentAction(){}
 `);
 let source = readFileSync(new URL('../components/chat/mock-chat.tsx', import.meta.url), 'utf8');

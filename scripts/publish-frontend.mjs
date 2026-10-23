@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
+import { stageAssets } from "./release-artifacts.mjs";
 const [stack, region = "us-east-1", flag] = process.argv.slice(2);
 if (!stack || !["us-east-1", "ap-southeast-1", "ap-southeast-7"].includes(region)) throw new Error("Usage: node scripts/publish-frontend.mjs STACK REGION [--apply]");
 const build = JSON.parse(readFileSync("out/wellync-build.json", "utf8"));
@@ -7,7 +8,10 @@ if (build.mode !== "aws") throw new Error("Run npm run build:aws first");
 const data = JSON.parse(execFileSync("aws", ["cloudformation", "describe-stacks", "--stack-name", stack, "--region", region, "--output", "json"], { encoding: "utf8" }));
 const outputs = Object.fromEntries(data.Stacks[0].Outputs.map(item => [item.OutputKey, item.OutputValue]));
 if (!outputs.FrontendBucketName || build.clientId !== outputs.CognitoClientId || build.domain !== outputs.CognitoDomain) throw new Error("Build config does not match this stack; regenerate aws-config and build:aws");
-const args = ["s3", "sync", "out/", `s3://${outputs.FrontendBucketName}/`, "--region", region, "--delete"];
-if (flag !== "--apply") args.push("--dryrun");
-execFileSync("aws", args, { stdio: "inherit" });
+const staged = build.assets ? stageAssets("out", build) : null;
+try {
+  const args = ["s3", "sync", staged ? `${staged.directory}/` : "out/", `s3://${outputs.FrontendBucketName}/`, "--region", region, "--delete"];
+  if (flag !== "--apply") args.push("--dryrun");
+  execFileSync("aws", args, { stdio: "inherit" });
+} finally { staged?.cleanup(); }
 console.log(flag === "--apply" ? `Published to ${outputs.ApiEndpoint}` : "Dry run only. Add --apply to upload files and remove obsolete frontend assets.");

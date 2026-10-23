@@ -9,6 +9,7 @@ import { formatThaiDate } from "@/lib/utils";
 import { MobileShell } from "@/components/layouts/mobile-shell";
 import { EarlyWarningCard } from "@/components/health/early-warning-card";
 import { DailyCareTasks } from "@/components/health/daily-care-tasks";
+import { FollowUpInbox } from "@/components/health/patient-memory";
 import { HospitalCampaignCarousel } from "@/components/health/hospital-carousel";
 import { MobileSheet } from "./mobile-sheet";
 import { TaskActionSheet } from "./task-action-sheet";
@@ -41,6 +42,7 @@ export function HealthHome({ role }: { role: "patient" | "caregiver" }) {
     { title:"ขยับร่างกาย", value:"150", unit:"นาที/สัปดาห์", color:"bg-[#fff0d5]", rotation:"rotate-[-1deg]", text:"เป้าหมายออกกำลังกายรวม 150 นาทีต่อสัปดาห์ เฉลี่ยวันละ 30 นาที 5 วัน ตามเป้าหมายในแผนดูแล" }
   ];
   return <MobileShell role={role} title="WELLYNC">
+    <FollowUpInbox patientId={patient.id} role={role} />
     <section>
       <p className="text-sm text-slate-500">{role === "patient" ? "สวัสดี" : `สวัสดี ${caregiver.name.split(" ")[0]}`} <span className="inline-block origin-bottom-right" aria-hidden="true">☀</span></p>
       <h2 className="mt-0.5 text-[26px] font-bold leading-9 tracking-tight">{role === "patient" ? patient.name : `วันนี้ดูแล ${patient.name.split(" ")[0]}`}</h2>
