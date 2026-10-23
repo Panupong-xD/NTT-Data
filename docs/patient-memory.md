@@ -1,6 +1,6 @@
 # Shared patient context and bounded role agents
 
-Release: `memory-agents-20261022-v1`.
+Release: `judging-ready-20261023-v1` (supersedes `memory-agents-20261022-v1`). See [competition review](competition-readiness.md).
 
 ## User journey
 
@@ -56,6 +56,9 @@ Draft tools only prepare validated data for a visible confirmation card. Actual 
 - Relevant 7/30-day aggregates, selected reviewed-plan sections, up to three recent labeled readings and up to two recent chat pairs are sent. Images and full historical records are not attached repeatedly.
 - Longer-range questions can request up to 365 days of daily aggregates in a bounded paginated read; the model receives only the resulting summary, not all rows.
 - No nightly LLM summarization, automatic chat-to-medical-memory extraction or model calls when opening dashboards.
+- Source details and the actual selected tools are shown in patient/caregiver chat and physician drafts. Sources identify data supplied to the model, not proof of medical correctness or hidden chain of thought.
+- Allowlisted same-region model IDs are enforced at runtime as well as in templates, including when environment variables are edited manually. Emergency text uses the safety shortcut even when an image is attached.
+- Sanitized `ai_request`, `agent_plan`, `agent_completed` and `ai_usage` logs support read-only latency, tool-use, success and token evidence. No health text/tool arguments are logged. See `scripts/judging-evidence.mjs`; token counts do not replace AWS Billing.
 - Existing daily user/global byte-unit budgets are reserved before every model call. The per-minute request limit counts one logical request, including its optional second call.
 - Changing/deleting a meal, changing preferences/cases, changing a reviewed plan/profile/recent reading, or crossing Bangkok midnight invalidates incompatible stored chat context. Prior visible answers are marked stale when the page receives a local memory update.
 

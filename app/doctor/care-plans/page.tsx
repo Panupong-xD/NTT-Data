@@ -9,9 +9,11 @@ import { EmptyState, PatientAvatar, planStatusLabel, SearchField, SectionHeading
 import { MarkdownRenderer } from "@/components/ui/markdown-renderer";
 import { useMockStore } from "@/lib/hooks/use-mock-store";
 import { publishCarePlan } from "@/lib/services/mock-store";
-import { askAI } from "@/lib/services/ai/client";
+import { askAssistant } from "@/lib/services/ai/client";
 import { isAwsMode } from "@/lib/runtime";
 import { CarePlan } from "@/lib/types";
+import { AgentEvidence } from "@/components/health/agent-evidence";
+import type { AssistantReply } from "@/lib/services/patient-memory";
 import { formatThaiDate } from "@/lib/utils";
 
 const categories = [{ key:"medication", label:"ยา", icon:Pill },{ key:"diet", label:"อาหาร", icon:Utensils },{ key:"exercise", label:"การออกกำลังกาย", icon:Dumbbell },{ key:"measurement", label:"การวัดค่า", icon:ClipboardList },{ key:"followUp", label:"การติดตาม", icon:CalendarDays },{ key:"lifestyle", label:"การใช้ชีวิต", icon:Heart }] as const;
@@ -28,6 +30,7 @@ export default function DoctorCarePlansPage() {
   const [editing, setEditing] = useState(false);
   const [fields, setFields] = useState<Fields>(emptyFields);
   const [rewriting, setRewriting] = useState(false);
+  const [agentReply, setAgentReply] = useState<{ id: string; reply: AssistantReply } | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [createPatient, setCreatePatient] = useState(db.patients[0]?.id || "");
   const [createFields, setCreateFields] = useState<Fields>(fieldsOf(db.carePlans.find(p => p.patientId === createPatient)));
@@ -51,10 +54,13 @@ export default function DoctorCarePlansPage() {
   async function rewrite() {
     if (!selected || !patient) return;
     setRewriting(true);
+    setAgentReply(null);
     try {
-      const answer = await askAI(["ตอบเป็นภาษาไทย สรุปแผนดูแลที่บ้านสำหรับแพทย์ 1 ย่อหน้า ไม่เกิน 3 ประโยค", `การวินิจฉัย: ${patient.diagnosis.join(", ")}`, `ยา: ${patient.medications.join(", ")}`, `ร่างเดิม: ${selected.summary}`].join("\n"), undefined, { patientId:patient.id });
-      if (!answer.trim()) throw new Error("ยังไม่ได้รับคำแนะนำ กรุณาลองอีกครั้ง");
-      setDb(current => ({ ...current, carePlans:current.carePlans.map(p => p.id === selected.id ? { ...p, summary:answer, status:"draft", updatedAt:new Date().toISOString() } : p) }));
+      const answer = await askAssistant(["ช่วยร่างสรุปแผนดูแลที่บ้านสำหรับแพทย์ ไม่เกิน 3 ประโยค ใช้ข้อมูลล่าสุด สรุปอาหารและเรื่องติดตามที่เกี่ยวข้อง ไม่เสนอปรับยาเอง", `ร่างที่แพทย์กำลังแก้ (ยังไม่ใช่แผนอนุมัติ): ${selected.summary.slice(0, 1200)}`].join("\n"), undefined, { patientId:patient.id });
+      const text = answer.actionDraft?.type === "care-plan" ? answer.actionDraft.summary : answer.text;
+      if (!text.trim()) throw new Error("ยังไม่ได้รับคำแนะนำ กรุณาลองอีกครั้ง");
+      setDb(current => ({ ...current, carePlans:current.carePlans.map(p => p.id === selected.id ? { ...p, summary:text, status:"draft", updatedAt:new Date().toISOString() } : p) }));
+      setAgentReply({ id: selected.id, reply: answer });
       toast.success("ปรับร่างแล้ว กรุณาตรวจสอบก่อนส่งต่อ");
     } catch (error) { toast.error(error instanceof Error ? error.message : "ปรับแผนไม่สำเร็จ"); }
     finally { setRewriting(false); }
@@ -62,6 +68,7 @@ export default function DoctorCarePlansPage() {
   return <DoctorShell title="แผนดูแล" description="เปลี่ยนคำแนะนำให้เป็นแผนที่ผู้ป่วยนำไปใช้ได้ง่าย" action={<button className="doc-button" disabled={rewriting || editing} onClick={() => setCreateOpen(true)}><Plus size={17} />เขียนแผนดูแล</button>}>
     <div className="doctor-master-detail"><aside className="doctor-directory"><SectionHeading title="แผนของผู้ป่วย"><span className="doctor-directory-count">{plans.length} แผน</span></SectionHeading><SearchField value={query} onChange={setQuery} /><div className="doctor-filter-chips">{[{ value:"all", label:"ทั้งหมด" },{ value:"draft", label:"รอส่ง" },{ value:"published", label:"ส่งแล้ว" }].map(f => <button key={f.value} aria-pressed={filter === f.value} onClick={() => setFilter(f.value)}>{f.label}</button>)}</div><div className="doctor-directory-list">{plans.map((plan,i) => { const person = db.patients.find(p => p.id === plan.patientId); return <button key={plan.id} disabled={editing || rewriting} aria-pressed={selectedId === plan.id} className={`doctor-directory-item${selectedId === plan.id ? " selected" : ""}`} onClick={() => setSelectedId(plan.id)}><PatientAvatar name={person?.name || "ผู้ป่วย"} index={i} /><div><b>{person?.name || plan.patientId}</b><small>{plan.status === "published" ? "ส่งให้ผู้ป่วยแล้ว" : planStatusLabel(plan.status)} · {plan.patientId}</small></div></button>; })}{!plans.length && <EmptyState title="ไม่พบแผนดูแล" detail="ลองเปลี่ยนคำค้นหรือตัวกรอง" />}</div></aside>
       {selected && patient ? <article className="doctor-plan-paper"><div className="doctor-patient-header"><PatientAvatar name={patient.name} large index={1} /><div><h2>{patient.name}</h2><p>{patient.id} · อัปเดต {formatThaiDate(selected.updatedAt)}</p></div><span className={`doctor-status status-${selected.status === "published" ? "green" : "yellow"}`}>{planStatusLabel(selected.status)}</span></div>
+        {agentReply?.id === selected.id && <AgentEvidence reply={agentReply.reply} />}
         {editing ? <><PlanFields fields={fields} onChange={setFields} /><div className="doctor-form-actions"><button className="doc-button secondary" onClick={() => setEditing(false)}>ยกเลิก</button><button className="doc-button" onClick={saveEdit} disabled={!fields.summary.trim()}><Save size={15} />บันทึกร่าง</button></div></> : <><div className="doctor-plan-summary"><h3>แนวทางการดูแลที่บ้าน</h3><MarkdownRenderer content={selected.summary} /></div><div className="doctor-plan-sections">{categories.map(c => <section className="doctor-plan-section" key={c.key}><h3><c.icon />{c.label}</h3>{selected[c.key].filter(Boolean).length ? <ul>{selected[c.key].filter(Boolean).map((line,i) => <li key={i}>{line}</li>)}</ul> : <p>ยังไม่ได้ระบุคำแนะนำ</p>}</section>)}</div><div className="doctor-form-actions"><p>ตรวจสอบแผนก่อนส่งให้ผู้ป่วยและผู้ดูแล</p><button className="doc-button secondary small" disabled={rewriting} onClick={() => { setFields(fieldsOf(selected)); setEditing(true); }}><Edit3 size={14} />แก้ไข</button><button className="doc-button secondary small" disabled={rewriting} onClick={rewrite}>{rewriting ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}ให้ผู้ช่วยปรับแผน</button><button className="doc-button small" disabled={rewriting || selected.status === "published"} onClick={() => { setDb(current => publishCarePlan(current,selected)); }}><Check size={14} />{selected.status === "published" ? "ส่งแผนแล้ว" : "อนุมัติและส่งแผน"}</button></div></>}
       </article> : <section className="doctor-panel"><EmptyState title="ยังไม่มีแผนดูแล" detail="เริ่มเขียนคำแนะนำสำหรับผู้ป่วยของคุณ" /></section>}</div>
       <Dialog.Root open={createOpen} onOpenChange={setCreateOpen}><Dialog.Portal><Dialog.Overlay className="doctor-modal-overlay" /><Dialog.Content className="doctor-modal"><Dialog.Title>เขียนแผนดูแล</Dialog.Title><Dialog.Description className="doctor-modal-description">บันทึกเป็นฉบับร่างก่อนส่งต่อให้ผู้ป่วย</Dialog.Description><Dialog.Close className="doctor-modal-close" aria-label="ปิดแบบฟอร์ม"><X size={20} /></Dialog.Close><label className="doctor-field"><span>ผู้ป่วย</span><select value={createPatient} onChange={e => { setCreatePatient(e.target.value); setCreateFields(fieldsOf(db.carePlans.find(p => p.patientId === e.target.value))); }}>{db.patients.map(p => <option key={p.id} value={p.id}>{p.name} · {p.id}</option>)}</select></label>{db.carePlans.some(p => p.patientId === createPatient) && <p className="text-xs text-sky-600 mb-5">มีแผนเดิม · บันทึกเพื่อปรับเป็นฉบับร่าง กิจกรรมและนัดหมายยังอยู่ครบ</p>}<PlanFields fields={createFields} onChange={setCreateFields} /><div className="doctor-form-actions"><Dialog.Close className="doc-button secondary">ยกเลิก</Dialog.Close><button className="doc-button" onClick={saveCreate} disabled={!createFields.summary.trim()}><Save size={15} />บันทึกร่าง</button></div></Dialog.Content></Dialog.Portal></Dialog.Root>

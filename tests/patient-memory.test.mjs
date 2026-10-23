@@ -26,7 +26,7 @@ test('nutrition preserves unknowns, normalizes units and scales explicit portion
 });
 test('release cannot update another stack or deploy a corrupt backend', () => {
   const zip = Buffer.from('synthetic code');
-  const build = { mode: 'aws', revision: 'memory-agents-20261022-v1', clientId: 'client', domain: 'https://example.test', backendSHA256: createHash('sha256').update(zip).digest('base64') };
+  const build = { mode: 'aws', revision: 'judging-ready-20261023-v1', clientId: 'client', domain: 'https://example.test', backendSHA256: createHash('sha256').update(zip).digest('base64') };
   const outputs = { CognitoClientId: 'client', CognitoDomain: build.domain, BackendExecutionRoleArn: 'role', DynamoDBTableName: 'table' };
   const config = { Role: 'role', Environment: { Variables: { DYNAMODB_TABLE: 'table', AI_ENABLED: 'true', BEDROCK_MODEL: 'current-model' } }, Runtime: 'nodejs22.x', Architectures: ['arm64'], State: 'Active', LastUpdateStatus: 'Successful' };
   const original = structuredClone(config);

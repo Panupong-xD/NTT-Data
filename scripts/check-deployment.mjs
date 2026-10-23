@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import assert from "node:assert/strict";
 const template = readFileSync("lambda-backend/template.yaml", "utf8");
-assert(!template.includes("AWS::CloudFront::"), "CloudFront is not permitted");
+assert(!template.includes("AWS::CloudFront::"), "CloudFront is excluded by the project's chosen architecture");
 assert(template.includes("AuthorizationType: JWT"));
 assert(template.includes("AuthorizationScopes: [openid]"));
 assert(!template.includes("Resource: '*'"), "Unscoped runtime permissions");

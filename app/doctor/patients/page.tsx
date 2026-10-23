@@ -9,7 +9,9 @@ import { DoctorTabs, DoctorTabContent, EmptyState, hasPatientAccess, PatientAvat
 import { DoctorHealthChart } from "@/components/health/lazy-charts";
 import { useMockStore } from "@/lib/hooks/use-mock-store";
 import { createDoctorRequest, publishCarePlan } from "@/lib/services/mock-store";
-import { askAI } from "@/lib/services/ai/client";
+import { askAssistant } from "@/lib/services/ai/client";
+import { AgentEvidence } from "@/components/health/agent-evidence";
+import type { AssistantReply } from "@/lib/services/patient-memory";
 import { formatThaiDate } from "@/lib/utils";
 import { PatientMemoryPanel } from "@/components/health/patient-memory";
 
@@ -21,6 +23,7 @@ export default function DoctorPatientsPage() {
   const [tab, setTab] = useState("summary");
   const [draft, setDraft] = useState(db.carePlans.find(p => p.patientId === selectedId)?.summary || "");
   const [rewriting, setRewriting] = useState(false);
+  const [agentReply, setAgentReply] = useState<{ id: string; reply: AssistantReply } | null>(null);
   const deepLinkApplied = useRef(false);
   useEffect(() => { if (deepLinkApplied.current) return; const id = new URLSearchParams(window.location.search).get("patient"); if (id && db.patients.some(p => p.id === id)) { setSelectedId(id); setDraft(db.carePlans.find(p => p.patientId === id)?.summary || ""); deepLinkApplied.current = true; } }, [db.carePlans, db.patients]);
   const selected = db.patients.find(p => p.id === selectedId);
@@ -34,10 +37,13 @@ export default function DoctorPatientsPage() {
   async function rewrite() {
     if (!selected || !approved || !plan) return;
     setRewriting(true);
+    setAgentReply(null);
     try {
-      const answer = await askAI(["ตอบเป็นภาษาไทยในรูปแบบแผนดูแลที่บ้านสำหรับแพทย์ แบ่งหัวข้อยา อาหาร การออกกำลัง การวัดค่า การติดตาม และการใช้ชีวิต", `Diagnosis: ${selected.diagnosis.join(", ")}`, `Medication: ${selected.medications.join(", ")}`, `ข้อมูลล่าสุด: ${latest ? `BP ${latest.systolic}/${latest.diastolic}, Blood Sugar ${latest.bloodSugar}, Sleep ${latest.sleepHours}, Exercise ${latest.exerciseMinutes} นาที` : "ยังไม่มีบันทึก"}`, `ร่างเดิม: ${draft}`].join("\n"), undefined, { patientId: selected.id });
-      if (!answer.trim()) throw new Error("ยังไม่ได้รับคำแนะนำ กรุณาลองอีกครั้ง");
-      setDraft(answer);
+      const answer = await askAssistant(["ช่วยร่างแผนดูแลที่บ้านสำหรับแพทย์ จากข้อมูลล่าสุดที่มีสิทธิ์เข้าถึง รวมสรุปอาหารและเรื่องติดตามที่เกี่ยวข้อง ให้แพทย์ตรวจ ไม่เสนอปรับยาเอง", `ร่างที่แพทย์กำลังแก้ (ยังไม่ใช่แผนอนุมัติ): ${draft.slice(0, 1200)}`].join("\n"), undefined, { patientId: selected.id });
+      const text = answer.actionDraft?.type === "care-plan" ? answer.actionDraft.summary : answer.text;
+      if (!text.trim()) throw new Error("ยังไม่ได้รับคำแนะนำ กรุณาลองอีกครั้ง");
+      setDraft(text);
+      setAgentReply({ id: selected.id, reply: answer });
     } catch (error) { toast.error(error instanceof Error ? error.message : "ยังปรับแผนไม่ได้ กรุณาลองอีกครั้ง"); }
     finally { setRewriting(false); }
   }
@@ -48,7 +54,7 @@ export default function DoctorPatientsPage() {
       <DoctorTabContent value="summary" className="doctor-tab-content"><PatientMemoryPanel patientId={selectedId} role="doctor" /><div className="doctor-last-record"><span>ค่าล่าสุด {latest ? `· ${formatThaiDate(latest.date)}` : "· ยังไม่มีบันทึก"}</span><span>{records.length} บันทึก</span></div><div className="doctor-metric-strip"><div><span>ความดันโลหิต</span><b>{latest ? `${latest.systolic}/${latest.diastolic}` : "—"}<small>mmHg</small></b></div><div><span>น้ำตาลในเลือด</span><b>{latest?.bloodSugar ?? "—"}<small>mg/dL</small></b></div><div><span>ชีพจร</span><b>{latest?.heartRate ?? "—"}<small>ครั้ง/นาที</small></b></div></div><dl><div className="doctor-info-row"><dt>โรคประจำตัว</dt><dd>{selected.diagnosis.join(" · ") || "ไม่มีข้อมูล"}</dd></div><div className="doctor-info-row"><dt>ประวัติการแพ้</dt><dd className={selected.allergies.length ? "doctor-allergy" : ""}>{selected.allergies.length > 0 && <AlertCircle size={16} className="mt-1 shrink-0" />}{selected.allergies.join(" · ") || "ไม่มีประวัติแพ้ยา"}</dd></div><div className="doctor-info-row"><dt>ยาที่ใช้ประจำ</dt><dd>{selected.medications.join(" · ") || "ไม่มีข้อมูล"}</dd></div><div className="doctor-info-row"><dt>สถานพยาบาล</dt><dd>{selected.hospital}</dd></div><div className="doctor-info-row"><dt>ผู้ดูแล</dt><dd>{db.caregivers.find(c => c.id === selected.caregiverId)?.name || "ยังไม่มีข้อมูล"}<span className="block text-xs text-slate-400 mt-1">{records.filter(r => r.confirmationStatus === "pending").length} บันทึกรอผู้ดูแลยืนยัน</span></dd></div></dl><details className="mt-3"><summary>ข้อมูลส่วนบุคคลเพิ่มเติม</summary><dl><div className="doctor-info-row"><dt>เลขบัตรประชาชน</dt><dd>{selected.citizenId}</dd></div><div className="doctor-info-row"><dt>ติดต่อ</dt><dd>{selected.phone || selected.email || "ไม่มีข้อมูล"}</dd></div><div className="doctor-info-row"><dt>น้ำหนัก / ส่วนสูง</dt><dd>{latest?.weight ?? selected.weight ?? "—"} กก. / {latest?.height ?? selected.height ?? "—"} ซม.</dd></div></dl></details></DoctorTabContent>
       <DoctorTabContent value="monitoring" className="doctor-tab-content"><DoctorHealthChart records={records} /></DoctorTabContent>
       <DoctorTabContent value="timeline" className="doctor-tab-content"><SectionHeading title="บันทึกจากที่บ้าน" detail="รายการล่าสุด พร้อมสถานะการยืนยัน" /><div className="doctor-table-wrap"><table className="doctor-table"><thead><tr><th>วันที่</th><th>ความดัน</th><th>น้ำตาล</th><th>นอนหลับ</th><th>สถานะ</th></tr></thead><tbody>{records.slice(-14).reverse().map(r => <tr key={r.id}><td>{formatThaiDate(r.date)}</td><td>{r.systolic}/{r.diastolic}</td><td>{r.bloodSugar} mg/dL</td><td>{r.sleepHours} ชม.</td><td><span className={`doctor-status status-${r.confirmationStatus === "confirmed" ? "green" : r.confirmationStatus === "rejected" ? "red" : "yellow"}`}>{r.confirmationStatus === "confirmed" ? "ยืนยันแล้ว" : r.confirmationStatus === "rejected" ? "ปฏิเสธ" : "รอยืนยัน"}</span></td></tr>)}</tbody></table></div>{!records.length && <EmptyState title="ยังไม่มีบันทึกสุขภาพ" />}</DoctorTabContent>
-      <DoctorTabContent value="careplan" className="doctor-tab-content">{plan ? <><SectionHeading title="สรุปแผนดูแล" detail="ปรับข้อความ แล้วตรวจสอบก่อนส่งต่อ"><Link className="doctor-text-link" href={`/doctor/care-plans?patient=${selected.id}`}>แผนฉบับเต็ม <ArrowUpRight size={15} /></Link></SectionHeading><label className="doctor-field"><span>คำแนะนำสำหรับผู้ป่วย</span><textarea rows={8} value={draft} onChange={e => setDraft(e.target.value)} disabled={rewriting} /></label><div className="doctor-form-actions"><button className="doc-button secondary" disabled={rewriting} onClick={rewrite}>{rewriting ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />}ให้ผู้ช่วยปรับแผน</button><button className="doc-button" disabled={rewriting || !draft.trim()} onClick={() => { setDb(current => publishCarePlan(current,{ ...plan, summary:draft })); }}><Check size={15} />อนุมัติและส่งแผน</button></div></> : <EmptyState title="ยังไม่มีแผนดูแล"><Link className="doc-button" href="/doctor/care-plans"><FileText size={15} />เขียนแผนดูแล</Link></EmptyState>}</DoctorTabContent>
+      <DoctorTabContent value="careplan" className="doctor-tab-content">{plan ? <><SectionHeading title="สรุปแผนดูแล" detail="ปรับข้อความ แล้วตรวจสอบก่อนส่งต่อ"><Link className="doctor-text-link" href={`/doctor/care-plans?patient=${selected.id}`}>แผนฉบับเต็ม <ArrowUpRight size={15} /></Link></SectionHeading><label className="doctor-field"><span>คำแนะนำสำหรับผู้ป่วย</span><textarea rows={8} value={draft} onChange={e => setDraft(e.target.value)} disabled={rewriting} /></label>{agentReply?.id === selected.id && <AgentEvidence reply={agentReply.reply} />}<div className="doctor-form-actions"><button className="doc-button secondary" disabled={rewriting} onClick={rewrite}>{rewriting ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />}ให้ผู้ช่วยปรับแผน</button><button className="doc-button" disabled={rewriting || !draft.trim()} onClick={() => { setDb(current => publishCarePlan(current,{ ...plan, summary:draft })); }}><Check size={15} />อนุมัติและส่งแผน</button></div></> : <EmptyState title="ยังไม่มีแผนดูแล"><Link className="doc-button" href="/doctor/care-plans"><FileText size={15} />เขียนแผนดูแล</Link></EmptyState>}</DoctorTabContent>
       </DoctorTabs>}
     </section> : <section className="doctor-panel"><EmptyState title="ยังไม่มีผู้ป่วย" /></section>}</div>
   </DoctorShell>;

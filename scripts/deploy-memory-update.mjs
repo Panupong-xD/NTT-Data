@@ -6,7 +6,7 @@ import { resolve } from 'node:path';
 import { verifyAssets } from './release-artifacts.mjs';
 
 export function validateRelease(build, outputs, config, zip) {
-  if (build.mode !== 'aws' || build.revision !== 'memory-agents-20261022-v1') throw new Error('Wrong release bundle');
+  if (build.mode !== 'aws' || build.revision !== 'judging-ready-20261023-v1') throw new Error('Wrong release bundle');
   if (build.clientId !== outputs.CognitoClientId || build.domain !== outputs.CognitoDomain) throw new Error('Frontend belongs to a different Cognito client');
   if (config.Role !== outputs.BackendExecutionRoleArn || config.Environment?.Variables?.DYNAMODB_TABLE !== outputs.DynamoDBTableName) throw new Error('Backend configuration differs from the selected stack');
   if (config.Runtime !== 'nodejs22.x' || !config.Architectures?.includes('arm64')) throw new Error('This bundle expects the existing Node.js 22 arm64 backend');

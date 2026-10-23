@@ -20,8 +20,9 @@ export interface PatientContext {
   food: Record<"today" | "week" | "month", { days: number; recordedDays: number; recordedMeals: number; estimatedTotals: Record<string, number | null>; mealsWithEstimate: Record<string, number>; topFoods: { name: string; count: number }[] }>;
 }
 export type AssistantDraft = { type: "follow-up"; title: string; note: string } | { type: "preference"; notes: string; expectedVersion: number } | { type: "care-plan"; summary: string };
-export interface ContextSource { asOf: string; revision: string; recordedMeals?: number; recordedDays?: number; planUpdatedAt?: string; hasPreferences?: boolean; stale?: boolean }
-export interface AssistantReply { text: string; actionDraft?: AssistantDraft; contextSource?: ContextSource; trace?: { tool: string; status: string }[] }
+export interface ContextSource { asOf: string; revision: string; recordedMeals?: number; recordedDays?: number; planUpdatedAt?: string; hasPreferences?: boolean; stale?: boolean; sources?: { label: string; detail: string }[] }
+export interface AgentExecution { modelCalls: number; toolCalls: number; durationMs: number; requiresConfirmation: boolean }
+export interface AssistantReply { text: string; actionDraft?: AssistantDraft; contextSource?: ContextSource; trace?: { tool: string; status: string }[]; execution?: AgentExecution }
 export function memoryChanged() { window.dispatchEvent(new Event("wellync-memory-updated")); }
 export const getPatientContext = (patientId: string) => cloudRequest<PatientContext>(`/api/patient-context?patientId=${encodeURIComponent(patientId)}`);
 export const getMeals = (patientId: string, cursor?: string) => cloudRequest<{ meals: SavedMeal[]; nextCursor: string | null }>(`/api/meals?patientId=${encodeURIComponent(patientId)}&days=90${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`);

@@ -1,4 +1,23 @@
-# Validation record - 17 October 2026 (Asia/Bangkok)
+# Validation record
+
+## Final competition review - 23 October 2026 (Asia/Bangkok)
+
+Release `judging-ready-20261023-v1`, superseding `memory-agents-20261022-v1`.
+
+- Read all five pages of the supplied NTT DATA competition PDF, including judging criteria, AWS restrictions, budget and submission timeline. [Findings and remaining evidence](competition-readiness.md).
+- `npm run check`: frontend typecheck and **39 frontend/script tests + 43 backend tests = 82 passed**. Backend was rebuilt/retested after the final deadline/privacy changes.
+- `npm run lint`, `npm run lint:security`, `git diff --check`: passed.
+- SAM lint: both `template.yaml` and `template-existing-roles.yaml` valid. This is schema validation, not live account permission validation.
+- AWS-mode production static build passed with the existing stack's public Cognito client/domain and Email OTP. No secrets were added to the build. 125 static assets, largest 766,098 bytes, below the 4 MB serving limit.
+- Backend package contains compiled JS and production dependencies only, no native binaries. Extracted-package `/api/health` smoke test passed with revision `judging-ready-20261023-v1`; frontend manifest hashes verified locally.
+- New tests exercise evidence attribution for long-range summaries, canonical tool traces, privacy of execution logs, rejection of unapproved/cross-region model identifiers, emergency text with attached image, metrics without fabricated savings, paired task validation, and evidence UI rendering.
+- Production dependency audits on 23 October: frontend **0 vulnerabilities**, backend **0 vulnerabilities**. Frontend audit used the user's explicit approval to send dependency names/versions to npm. It does not inspect arbitrary application logic or prove absence of vulnerabilities.
+- Full frontend audit, including development tooling: **7 high-severity dependency entries** remain in the Tailwind 3/ESLint glob chain, originating from `braces` stack-exhaustion on deeply nested patterns (`GHSA-vfj7-8cjw-p6xm`, installed/current affected range <=3.0.3). No patched compatible braces version was returned by the audit. Suggested fixes require major tooling changes, including a Tailwind migration or eslint-config-next downgrade; no forced upgrade/downgrade or suppression was applied. These are not in production dependencies or the backend bundle. Build only trusted project content; a tooling migration with visual regression testing remains separate work.
+- No new AWS resources, role/policy mutations, paid model calls, Billing reads or actual before/after user study were performed. Release deployment, live model tool support/IAM, all-role browser acceptance, actual credit balance and measured benefits remain outstanding. No judge score or clinical outcome is claimed.
+
+The earlier entries below describe historical checks, not new verification of the live account.
+
+## Original validation - 17 October 2026
 
 ## Passed locally
 

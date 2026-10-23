@@ -14,3 +14,6 @@ lambda-backend/samconfig-otp.toml
 *.tsbuildinfo
 lambda-backend/node_modules/
 lambda-backend/dist/
+deployment/
+judging-evidence*.json
+workflow-times*.json

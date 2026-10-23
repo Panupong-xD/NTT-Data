@@ -10,7 +10,7 @@
 | DB/AI ล้มเหลวคืน clinical mock และ success | Fail closed, ไม่ปลอมผลลัพธ์; demo แยกผ่าน build mode |
 | Scan ทุก approval, update เพิ่ม row สถานะใหม่ | Query partition ผู้ป่วยที่มี consent; status เปลี่ยนใน item เดิมด้วย condition `PENDING` |
 | AI อาจอ้างว่าเปลี่ยนยา/แจ้งแพทย์แล้ว | ไม่ execute treatment; แพทย์ review และ publish แผนเอง; emergency heuristic ไม่อ้าง dispatch |
-| ประวัติไม่จำกัดและเลือกโมเดลแพงได้ | จำกัด input/window/output, allowlist Nova, timeout และ atomic minute/user/global allowances |
+| ประวัติไม่จำกัดและเลือกโมเดลแพงได้ | จำกัด input/window/output, allowlist Nova/Qwen แบบ same-region บน server, timeout และ atomic minute/user/global allowances |
 | Files ไม่ได้ส่งเข้าโมเดลจริง | ส่ง image bytes ผ่าน Converse กับ vision model เมื่อ admin เปิด; ตรวจ MIME/magic/ขนาด |
 | Next build ข้าม type errors, lint command ใช้ไม่ได้ | เปิด type check, ESLint flat config, backend/security tests และ SAM lint |
 | Hardcoded API ของบัญชีเก่า | Build config มาจาก stack outputs; same-origin API |
@@ -27,7 +27,7 @@
 - Draft care plans เก็บใน memory ของแท็บ ยังไม่ persist; publish เท่านั้นจึงเขียน shared data. ไม่ส่งร่าง AI ให้ patient อัตโนมัติ
 - Clinical observations/plans ที่ publish แล้วเป็นข้อมูลระบบกลาง, chat/ภาพไม่ถูกเก็บใน localStorage ใน AWS mode. Token อยู่ sessionStorage 15 นาที จึงยังต้องจัดการ XSS; CSP ยังอนุญาต inline scripts/styles สำหรับ Next static hydration
 - ข้อเสนอ AI มี confidence=0 เพราะยังไม่มี calibration; ไม่ควรตีความเป็นความมั่นใจทางคลินิก ไม่มี diagnosis, automatic medication changes หรือ emergency dispatch
-- ไม่มี AgentCore/Bedrock Agents managed planner หรือ external tools: workflow เป็น Lambda orchestration (authorize -> scoped context -> quota -> model -> pending review -> doctor publish). ควรสาธิตตามความสามารถจริง ไม่เรียกว่า autonomous clinical agent
+- ไม่มี AgentCore/Bedrock Agents managed planner หรือ external tools: เป็น custom agent loop ใน Lambda ที่โมเดลเลือกเรียก read/draft tools ตามบทบาท มี tool results กลับเข้าโมเดล ไม่เกิน 2 model calls และ 3 tools ต่อคำขอ; คนยืนยันก่อนเขียนข้อมูลสำคัญ ไม่ใช่ autonomous clinical agent
 - ยังไม่มี Bedrock Guardrails, malware scanning, clinical red-team evaluation, immutable clinical audit trail หรือ automated retention/deletion workflow สำหรับการใช้จริง
 - ภาพ JPEG/PNG เพียง 1 ภาพ, 500 KB; frontend resize 800px ภาพอ่านค่า/อาหารยังต้องยืนยันผล; ไม่รับ PDF/document upload ใน AI endpoint
 - Rate limits/units ลดความเสี่ยงค่าใช้จ่าย ไม่ใช่ dollar hard cap และไม่มี frontend public-traffic budget breaker; monitor AWS Billing/ผู้จัดและปิด AI เมื่อจำเป็น

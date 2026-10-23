@@ -294,3 +294,42 @@ test('long-range food questions paginate aggregates and return a bounded summary
   assert.equal(calls.filter(c => c.constructor.name === 'QueryCommand').length, 4);
   assert.ok(JSON.stringify(summary).length < 1500);
 });
+
+test('agent evidence identifies actual sources and logs bounded execution without private tool arguments', async () => {
+  reset(); await create(meal());
+  let count = 0;
+  bedrock.send = async command => {
+    modelCalls.push(command);
+    if (count++ === 0) return { output: { message: { role: 'assistant', content: [
+      { toolUse: { toolUseId: 'summary', name: 'read_food_summary', input: { days: 365 } } },
+      { toolUse: { toolUseId: 'preference', name: 'prepare_preference', input: { notes: 'PRIVATE_PREFERENCE_DO_NOT_LOG' } } }
+    ] } }, stopReason: 'tool_use' };
+    return { output: { message: { role: 'assistant', content: [{ text: 'สรุปตามช่วงที่มีบันทึก' }] } }, stopReason: 'end_turn' };
+  };
+  const logged = [], original = console.log;
+  let result;
+  console.log = text => logged.push(text);
+  try { result = await request('/api/ai/chat', 'POST', { content: 'สรุปอาหารย้อนหลังหนึ่งปี' }); }
+  finally { console.log = original; }
+  assert.equal(result.status, 200); assert.equal(result.data.execution.modelCalls, 2);
+  assert.equal(result.data.execution.toolCalls, 2); assert.ok(result.data.execution.durationMs >= 0);
+  assert.ok(result.data.contextSource.sources.some(source => source.label.includes('365 วัน')));
+  assert.ok(!JSON.stringify(result.data.contextSource).includes('DO_NOT_SEND_NAME'));
+  assert.ok(logged.some(text => JSON.parse(text).event === 'agent_plan'));
+  assert.ok(!logged.join('').includes('PRIVATE_PREFERENCE_DO_NOT_LOG'));
+  assert.ok(!logged.join('').includes('สรุปอาหารย้อนหลังหนึ่งปี'));
+});
+
+test('cross-region and unapproved model IDs stop before inference; emergency text with an image skips the model', async () => {
+  reset(); const original = process.env.BEDROCK_MODEL;
+  try {
+    for (const model of ['us.amazon.nova-lite-v1:0', 'arn:aws:sagemaker:us-east-1:123456789012:endpoint/marketplace', 'unapproved']) {
+      process.env.BEDROCK_MODEL = model;
+      assert.equal((await request('/api/ai/chat', 'POST', { content: 'ช่วยดูอาหาร' })).status, 503);
+    }
+    assert.equal(modelCalls.length, 0);
+    const response = await request('/api/ai/chat', 'POST', { content: 'เจ็บหน้าอก', files: [{ type: 'image/png', name: 'test', data: 'ZmFrZQ==' }] });
+    assert.equal(response.status, 200); assert.equal(response.data.modelUsed, 'safety-message');
+    assert.equal(modelCalls.length, 0);
+  } finally { process.env.BEDROCK_MODEL = original; }
+});

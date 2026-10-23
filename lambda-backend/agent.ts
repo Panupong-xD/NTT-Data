@@ -5,6 +5,7 @@ import { authorizePatient, HttpError, type Identity } from "./security.js";
 import { reserveAIUsage } from "./db.js";
 
 type Context = Awaited<ReturnType<typeof patientContext>>;
+export type EvidenceSource = { label: string; detail: string };
 export type ActionDraft = { type: "follow-up"; title: string; note: string } | { type: "preference"; notes: string; expectedVersion: number } | { type: "care-plan"; summary: string };
 export function contextPacket(context: Context, question: string) {
   const food = /อาหาร|เมนู|กิน|มื้อ|หวาน|เค็ม|โซเดียม|แคล|food|eat|meal|diet|nutrition/i.test(question);
@@ -23,7 +24,13 @@ export function contextPacket(context: Context, question: string) {
   };
   const text = JSON.stringify(packet);
   if (Buffer.byteLength(text) > 12000) throw new HttpError(413, "บริบทสุขภาพยาวเกินขอบเขต กรุณาให้ผู้ดูแลช่วยตรวจรายการข้อมูล");
-  return { text, food };
+  const sources: EvidenceSource[] = [{ label: "ข้อมูลสุขภาพพื้นฐาน", detail: "โรค ยา และการแพ้ที่บันทึกในระบบ ไม่รวมชื่อหรือข้อมูลติดต่อ" }];
+  if (packet.preferences) sources.push({ label: "สิ่งที่ผู้ป่วยยืนยันให้จำ", detail: "ความต้องการในชีวิตประจำวัน แยกจากข้อมูลการรักษา" });
+  if (packet.activePlan) sources.push({ label: "แผนดูแลที่ผ่านการตรวจแล้ว", detail: `ฉบับย่อ อัปเดต ${packet.activePlan.updatedAt}` });
+  if (packet.food) for (const summary of Object.values(packet.food)) sources.push({ label: `สรุปอาหาร ${summary.days} วัน`, detail: `${summary.fromDate} ถึง ${summary.toDate}: บันทึก ${summary.recordedMeals} มื้อ ใน ${summary.recordedDays} วัน ค่าสารอาหารเป็นค่าประมาณ` });
+  if (packet.recentRecords?.length) sources.push({ label: "บันทึกสุขภาพล่าสุด", detail: `${packet.recentRecords.length} รายการ โดยแสดงสถานะรอยืนยันหรือยืนยันแล้วให้โมเดลเห็น` });
+  if (packet.openCases.length) sources.push({ label: "เรื่องที่กำลังติดตาม", detail: `${packet.openCases.length} เรื่องล่าสุด พร้อมสถานะ` });
+  return { text, food, sources };
 }
 const spec = (name: string, description: string, properties: Record<string, any> = {}, required: string[] = []): Tool => ({ toolSpec: { name, description, inputSchema: { json: { type: "object", properties, required, additionalProperties: false } } } });
 const stringField = (maxLength: number) => ({ type: "string", maxLength });
@@ -36,9 +43,11 @@ export const agentTools = (role: Identity["role"]): Tool[] => [
   ...(role === "doctor" ? [spec("prepare_care_plan", "เตรียมข้อความร่างสำหรับแพทย์ตรวจ ไม่เผยแพร่หรือเปลี่ยนการรักษา", { summary: stringField(1500) }, ["summary"])] : [])
 ];
 const empty = z.object({}).strict();
-export async function runAgent(client: BedrockRuntimeClient, identity: Identity, modelId: string, context: Context, messages: Message[], system: { text: string }[], deadline = Date.now() + 24000) {
+export async function runAgent(client: BedrockRuntimeClient, identity: Identity, modelId: string, context: Context, messages: Message[], system: { text: string }[], deadline = Date.now() + 24000, requestId?: string) {
+  const started = Date.now();
   const allowed = new Set(agentTools(identity.role).map(t => t.toolSpec!.name));
   const trace: { tool: string; status: string }[] = [];
+  const sources: EvidenceSource[] = [];
   let draft: ActionDraft | undefined;
   let usedFood = false;
   let inputTokens = 0, outputTokens = 0;
@@ -58,17 +67,20 @@ export async function runAgent(client: BedrockRuntimeClient, identity: Identity,
     }), { abortSignal: AbortSignal.timeout(Math.min(remaining, round === 0 ? 14000 : 10000)) });
     inputTokens += result.usage?.inputTokens || 0;
     outputTokens += result.usage?.outputTokens || 0;
-    console.log(JSON.stringify({ event: "ai_usage", modelId, inputTokens: result.usage?.inputTokens, outputTokens: result.usage?.outputTokens, budgetUnits: units, agentRole: identity.role, modelCall: round + 1, stopReason: result.stopReason }));
+    console.log(JSON.stringify({ event: "ai_usage", requestId, modelId, inputTokens: result.usage?.inputTokens, outputTokens: result.usage?.outputTokens, budgetUnits: units, agentRole: identity.role, modelCall: round + 1, stopReason: result.stopReason }));
     const output = result.output?.message;
     const requests = output?.content?.flatMap(block => block.toolUse ? [block.toolUse] : []) || [];
     if (!requests.length) {
       const text = output?.content?.map(block => block.text || "").join("").trim();
       if (!text || ["guardrail_intervened", "content_filtered"].includes(result.stopReason || "")) throw new HttpError(502, "AI could not return a usable answer");
       await authorizePatient(identity, context.patientId);
-      console.log(JSON.stringify({ event: "agent_completed", modelId, agentRole: identity.role, modelCalls: round + 1, toolCalls: trace.length }));
-      return { text, actionDraft: draft, trace, usedFood, usage: { inputTokens, outputTokens }, stopReason: result.stopReason };
+      const execution = { modelCalls: round + 1, toolCalls: trace.length, durationMs: Date.now() - started, requiresConfirmation: Boolean(draft) };
+      console.log(JSON.stringify({ event: "agent_completed", requestId, modelId, agentRole: identity.role, ...execution }));
+      return { text, actionDraft: draft, trace, sources, execution, usedFood, usage: { inputTokens, outputTokens }, stopReason: result.stopReason };
     }
     if (round !== 0 || requests.length > 3 || requests.some(t => !t.toolUseId) || new Set(requests.map(t => t.toolUseId)).size !== requests.length) throw new HttpError(502, "ผู้ช่วยขอทำงานเกินขอบเขต กรุณาลองใหม่");
+    // Record only validated tool names, never the model's reasoning or arguments.
+    console.log(JSON.stringify({ event: "agent_plan", requestId, agentRole: identity.role, tools: requests.map(t => allowed.has(t.name || "") ? t.name : "unavailable") }));
     messages.push(output!);
     const results: ContentBlock[] = [];
     for (const request of requests) {
@@ -81,16 +93,20 @@ export async function runAgent(client: BedrockRuntimeClient, identity: Identity,
             const args = z.object({ days: z.number().int().min(1).max(30).default(7), day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional() }).strict().parse(request.input);
             const data = await listMeals(identity, { patientId: context.patientId, days: String(args.days), day: args.day });
             usedFood = true;
+            sources.push({ label: "มื้ออาหารที่ยืนยันแล้ว", detail: `${args.day || `ย้อนหลัง ${args.days} วัน`}: ส่ง ${Math.min(data.meals.length, 6)} มื้อ${data.meals.length > 6 || data.nextCursor ? " ยังมีรายการอื่น" : ""}` });
             value = { day: args.day, meals: data.meals.slice(0, 6).map(m => ({ id: m.id, eatenAt: m.eatenAt, name: m.name, portion: m.portion, nutrition: m.nutrition, source: m.source })), hasMore: data.meals.length > 6 || Boolean(data.nextCursor), scope: "สูงสุด 6 มื้อที่บันทึก ไม่ใช่อาหารทั้งหมด" }; break;
           }
           case "read_follow_ups": {
             empty.parse(request.input);
             const data = await listCases(identity, context.patientId, true);
+            sources.push({ label: "บันทึกการติดตามร่วมกัน", detail: "สูงสุด 3 เรื่องที่ยังเปิด พร้อมบันทึกล่าสุดเรื่องละไม่เกิน 2 รายการ" });
             value = data.cases.filter(c => c.status !== "resolved").slice(0, 3).map(c => ({ id: c.id, title: c.title, status: c.status, notes: c.notes.slice(-2).map((n: any) => ({ role: n.role, text: n.text.slice(0, 250), date: n.date })) })); break;
           }
           case "read_food_summary": {
             const args = z.object({ days: z.number().int().min(1).max(365) }).strict().parse(request.input);
-            value = await readFoodSummary(identity, context.patientId, args.days); usedFood = true; break;
+            const summary = await readFoodSummary(identity, context.patientId, args.days);
+            value = summary; usedFood = true;
+            sources.push({ label: `สรุปอาหารย้อนหลัง ${args.days} วัน`, detail: `${summary.fromDate} ถึง ${summary.toDate}: ${summary.recordedMeals} มื้อ ใน ${summary.recordedDays} วันที่มีบันทึก ส่งเฉพาะสรุป ไม่ใช่ประวัติทุกมื้อ` }); break;
           }
           case "prepare_follow_up": {
             if (draft) throw new Error("Only one draft per request");
@@ -113,7 +129,7 @@ export async function runAgent(client: BedrockRuntimeClient, identity: Identity,
         if (!(error instanceof z.ZodError) && !(error instanceof HttpError && error.status === 400) && !(error instanceof Error && ["Tool not allowed for this role", "Only one draft per request"].includes(error.message))) throw error;
         status = "error"; value = { error: "Invalid or unavailable tool request; no data was changed" };
       }
-      trace.push({ tool: request.name || "unknown", status });
+      trace.push({ tool: allowed.has(request.name || "") ? request.name! : "unavailable", status });
       results.push({ toolResult: { toolUseId: request.toolUseId!, status, content: [{ text: JSON.stringify(value) }] } });
     }
     messages.push({ role: "user", content: results });

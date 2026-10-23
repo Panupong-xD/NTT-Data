@@ -7,7 +7,11 @@ import { listMeals, mutateMeal, patientContext, savePreferences, listCases, muta
 import { BACKEND_REVISION } from "./release.js";
 
 export async function handler(event: Event) {
-  const response = (statusCode: number, data: unknown) => ({ statusCode, headers: { "Content-Type": "application/json", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" }, body: JSON.stringify(data) });
+  const started = Date.now();
+  const response = (statusCode: number, data: unknown) => {
+    if (event.rawPath === "/api/ai/chat") console.log(JSON.stringify({ event: "ai_request", revision: BACKEND_REVISION, requestId: event.requestContext.requestId, status: statusCode, durationMs: Date.now() - started }));
+    return { statusCode, headers: { "Content-Type": "application/json", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" }, body: JSON.stringify(data) };
+  };
   const path = event.rawPath;
   const method = event.requestContext.http.method;
   try {
@@ -22,7 +26,7 @@ export async function handler(event: Event) {
     if (path === "/api/preferences" && method === "POST") return response(200, await savePreferences(identity, parseBody(event)));
     if (path === "/api/follow-ups" && method === "GET") return response(200, await listCases(identity, event.queryStringParameters?.patientId, event.queryStringParameters?.activeOnly === "true"));
     if (path === "/api/follow-ups" && method === "POST") return response(200, await mutateCase(identity, parseBody(event)));
-    if (path === "/api/ai/chat" && method === "POST") return response(200, await handleChat(identity, parseBody(event)));
+    if (path === "/api/ai/chat" && method === "POST") return response(200, await handleChat(identity, parseBody(event), event.requestContext.requestId));
     if (path === "/api/approvals" && method === "GET") return response(200, await handleGetApprovals(identity, event.queryStringParameters?.status));
     if (path === "/api/approvals" && method === "POST") return response(200, await handleApprovalDecision(identity, parseBody(event)));
     return response(404, { error: "Not found" });

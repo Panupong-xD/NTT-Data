@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/hooks/use-auth";
 import { toast } from "sonner";
+import { isAwsMode } from "@/lib/runtime";
 
 interface ProvinceData {
   id: number;
@@ -37,6 +38,10 @@ const getFirstDayOfMonth = (year: number, month: number) => {
 };
 
 export default function RegisterPage() {
+  if (isAwsMode) return <AuthCard title="ขอเปิดบัญชีใช้งาน" subtitle="ผู้ดูแลระบบเป็นผู้สร้างบัญชีและกำหนดบทบาท เพื่อป้องกันการเข้าถึงข้อมูลสุขภาพโดยไม่ได้รับอนุญาต"><p className="text-sm leading-7 text-slate-600">หากมีบัญชีแล้ว ให้เข้าสู่ระบบด้วยอีเมลที่ลงทะเบียนไว้ หากยังไม่มีบัญชี กรุณาติดต่อผู้ดูแลโครงการ</p><AuthLink href="/login">ไปหน้าเข้าสู่ระบบ</AuthLink></AuthCard>;
+  return <DemoRegisterPage />;
+}
+function DemoRegisterPage() {
   const { register: registerUser } = useAuth();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);

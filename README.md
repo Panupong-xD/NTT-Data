@@ -21,6 +21,8 @@ npm run dev
 
 อ่าน [ข้อจำกัดและการตรวจความพร้อม](docs/aws-readiness.md) และ [ผล validation](docs/validation.md) ก่อนใช้ ระบบนี้เป็น competition prototype ไม่ใช่ระบบสำหรับตัดสินใจทางคลินิกหรือระบบที่รับรอง PDPA/FHIR แล้ว
 
+รอบส่งผลงาน: [ตรวจครบ 6 เกณฑ์ พร้อมบทสาธิตและวิธีวัดผล](docs/competition-readiness.md), [Architecture และ Agent Workflow](docs/architecture.md), [Shared patient memory](docs/patient-memory.md).
+
 ```bash
 npm run check
 npm run lint
