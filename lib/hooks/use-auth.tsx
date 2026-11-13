@@ -210,14 +210,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               updatedAt: new Date().toISOString()
             };
 
-            console.log("DEBUG REGISTRATION STATE:", {
-              templateId,
-              somchaiRecordsCount: somchaiRecords.length,
-              clonedRecordsCount: clonedRecords.length,
-              somchaiCarePlan: !!somchaiCarePlan,
-              somchaiWarning: !!somchaiWarning
-            });
-
             const nextDb = {
               ...currentDb,
               patients: [...currentDb.patients, newPatient],
