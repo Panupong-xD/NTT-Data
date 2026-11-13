@@ -14,7 +14,7 @@
     "lint:security": "node scripts/check-deployment.mjs"
   },
   "dependencies": {
-    "@hookform/resolvers": "^3.9.1",
+    "@hookform/resolvers": "^5.9.2",
     "@radix-ui/react-avatar": "^1.1.2",
     "@radix-ui/react-dialog": "^1.1.4",
     "@radix-ui/react-dropdown-menu": "^2.1.4",
@@ -32,12 +32,13 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-hook-form": "^7.54.2",
-    "recharts": "^2.15.0",
+    "recharts": "^3.10.1",
     "sonner": "^1.7.1",
     "tailwind-merge": "^2.6.0",
-    "zod": "^3.24.1"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@eslint/eslintrc": "^3.3.7",
     "@types/node": "^22.10.5",
     "@types/react": "^19.0.4",
     "@types/react-dom": "^19.0.2",
@@ -46,8 +47,7 @@
     "eslint-config-next": "^15.5.28",
     "postcss": "^8.5.30",
     "tailwindcss": "^3.4.17",
-    "typescript": "^5.7.2",
-    "@eslint/eslintrc": "^3.3.7"
+    "typescript": "^5.7.2"
   },
   "overrides": {
     "next": {
