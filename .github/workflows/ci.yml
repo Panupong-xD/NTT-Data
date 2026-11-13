@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            lambda-backend/package-lock.json
+      - run: npm ci
+      - run: npm --prefix lambda-backend ci
+      - run: npm run check
+      - run: npm run lint
+      - run: npm run lint:security
+      - run: npm run build
