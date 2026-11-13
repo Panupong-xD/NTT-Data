@@ -12,7 +12,7 @@ import { MobileHealthChart } from "@/components/health/lazy-charts";
 import { HealthCharm } from "@/components/mobile/health-charm";
 import { MockChat } from "@/components/chat/mock-chat";
 import { useMockStore } from "@/lib/hooks/use-mock-store";
-import { addHealthRecord, deleteHealthRecord } from "@/lib/services/mock-store";
+import { addHealthRecord, deleteHealthRecord, seedFromTemplate } from "@/lib/services/mock-store";
 import { askAI } from "@/lib/services/ai/client";
 import { formatThaiDate } from "@/lib/utils";
 import { MarkdownRenderer } from "@/components/ui/markdown-renderer";
@@ -66,6 +66,27 @@ function compressAndResizeImage(file: File, maxWidth = 800, maxHeight = 800, qua
   });
 }
 
+const VITALS_PROMPT = [
+  "บทบาท: คุณคือ AI ผู้เชี่ยวชาญการประเมินภาพถ่ายเครื่องวัดทางแพทย์และอุปกรณ์ตรวจวัดสัญญาณชีพด้วยตนเองที่บ้านสำหรับผู้ป่วยโรคเบาหวานและความดันโลหิตสูง",
+  "หน้าที่: ตรวจประเมินภาพถ่ายอุปกรณ์และสกัดตัวเลขสัญญาณชีพเด่นจากภาพหน้าจอนั้น",
+  "คำแนะนำในการตรวจจับ:",
+  "- หากเป็นหน้าจอเครื่องวัดความดันโลหิต (มักแสดงเลข SYS, DIA, PULSE): ให้ระบุตัวเลข SYS ในช่อง systolic, DIA ในช่อง diastolic และ PULSE/Heart rate ในช่อง heartRate ส่วนช่องอื่นๆ เช่น sugar และ weight ให้เป็น null ห้ามเอาตัวเลขความดันหรือชีพจรไปใส่ในช่องน้ำหวานหรือน้ำหนักเด็ดขาด",
+  "- หากเป็นหน้าจอเครื่องวัดระดับน้ำตาลในเลือด (มักมีตัวเลข mg/dL): ให้ระบุค่าในช่อง bloodSugar ส่วนอื่นๆ เป็น null",
+  "- หากเป็นหน้าจอเครื่องชั่งน้ำหนัก (มักระบุค่าเป็น kg): ให้ระบุค่าในช่อง weight ส่วนอื่นๆ เป็น null",
+  "- หากไม่ใช่ภาพอุปกรณ์ข้างต้น หรือค่าไม่ชัดเจนเบลอมาก หรือวิเคราะห์ไม่ได้ ให้ระบุ type: 'unknown' และตั้งค่าตัวเลขทุกช่องเป็น null",
+  "",
+  "ให้ตอบกลับเป็นรูปแบบ JSON ต่อไปนี้เท่านั้น ห้ามมีข้อความเกริ่นหรือสรุปท้ายนอกจาก JSON:",
+  JSON.stringify({
+    type: "blood_pressure | blood_sugar | weight | unknown",
+    systolic: "number or null",
+    diastolic: "number or null",
+    heartRate: "number or null",
+    bloodSugar: "number or null",
+    weight: "number or null",
+    confidence: "high | low"
+  }, null, 2)
+].join("\n");
+
 export default function PatientHealthPage() {
   const { db, setDb } = useMockStore();
   const { user } = useAuth();
@@ -110,50 +131,10 @@ export default function PatientHealthPage() {
   });
 
   useEffect(() => {
-    if (!isAwsMode && patient && patient.id !== "P-0001") {
-      const patientRecords = db.healthRecords.filter(r => r.patientId === patient.id);
-      if (patientRecords.length === 0) {
-        const templateId = "P-0001";
-        const somchaiRecords = db.healthRecords.filter(r => r.patientId === templateId);
-        const clonedRecords = somchaiRecords.map((r, idx) => ({
-          ...r,
-          id: `${patient.id}-R-${idx}-${Date.now()}`,
-          patientId: patient.id,
-          weight: patient.weight || 70,
-          height: patient.height || 170
-        }));
-
-        const somchaiCarePlan = db.carePlans.find(cp => cp.patientId === templateId);
-        const clonedCarePlan = somchaiCarePlan ? {
-          ...somchaiCarePlan,
-          id: `plan-${patient.id}`,
-          patientId: patient.id,
-          tasks: somchaiCarePlan.tasks.map((t, idx) => ({
-            ...t,
-            id: `task-${patient.id}-${idx}`,
-            status: "pending" as const,
-            pendingConfirm: undefined
-          }))
-        } : null;
-
-        const somchaiWarning = db.earlyWarnings.find(ew => ew.patientId === templateId);
-        const clonedWarning = somchaiWarning ? {
-          ...somchaiWarning,
-          patientId: patient.id
-        } : null;
-
-        setDb((current) => {
-          if (current.healthRecords.some(r => r.patientId === patient.id)) return current;
-          return {
-            ...current,
-            healthRecords: [...current.healthRecords, ...clonedRecords],
-            earlyWarnings: clonedWarning ? [...current.earlyWarnings.filter(w => w.patientId !== patient.id), clonedWarning] : current.earlyWarnings,
-            carePlans: clonedCarePlan ? [...current.carePlans.filter(p => p.patientId !== patient.id), clonedCarePlan] : current.carePlans
-          };
-        });
-      }
-    }
-  }, [patient, db.healthRecords, db.earlyWarnings, db.carePlans, setDb]);
+    if (isAwsMode || !patient) return;
+    const next = seedFromTemplate(db, patient.id, patient);
+    if (next !== db) setDb(next);
+  }, [patient, db, setDb]);
 
   const [deviceScanning, setDeviceScanning] = useState(false);
   const [deviceImagePreview, setDeviceImagePreview] = useState("");
@@ -162,96 +143,51 @@ export default function PatientHealthPage() {
   const [isVitalsCameraOpen, setIsVitalsCameraOpen] = useState(false);
   const [isFoodCameraOpen, setIsFoodCameraOpen] = useState(false);
 
-  async function handleDeviceCameraCapture(base64Data: string) {
+  // Camera and uploaded photos share one path; the patient reviews every filled value before saving.
+  async function scanVitals(filesArray: Array<{ type: string; name: string; data: string }>) {
     setDeviceScanning(true);
-    setDeviceImagePreview(base64Data);
-
     try {
-      const filesArray = [
-        {
-          type: "image/jpeg",
-          name: "vitals_camera.jpg",
-          data: base64Data
-        }
-      ];
-
-      const prompt = [
-        "บทบาท: คุณคือ AI ผู้เชี่ยวชาญการประเมินภาพถ่ายเครื่องวัดทางแพทย์และอุปกรณ์ตรวจวัดสัญญาณชีพด้วยตนเองที่บ้านสำหรับผู้ป่วยโรคเบาหวานและความดันโลหิตสูง",
-        "หน้าที่: ตรวจประเมินภาพถ่ายอุปกรณ์และสกัดตัวเลขสัญญาณชีพเด่นจากภาพหน้าจอนั้น",
-        "คำแนะนำในการตรวจจับ:",
-        "- หากเป็นหน้าจอเครื่องวัดความดันโลหิต (มักแสดงเลข SYS, DIA, PULSE): ให้ระบุตัวเลข SYS ในช่อง systolic, DIA ในช่อง diastolic และ PULSE/Heart rate ในช่อง heartRate ส่วนช่องอื่นๆ เช่น sugar และ weight ให้เป็น null ห้ามเอาตัวเลขความดันหรือชีพจรไปใส่ในช่องน้ำหวานหรือน้ำหนักเด็ดขาด",
-        "- หากเป็นหน้าจอเครื่องวัดระดับน้ำตาลในเลือด (มักมีตัวเลข mg/dL): ให้ระบุค่าในช่อง bloodSugar ส่วนอื่นๆ เป็น null",
-        "- หากเป็นหน้าจอเครื่องชั่งน้ำหนัก (มักระบุค่าเป็น kg): ให้ระบุค่าในช่อง weight ส่วนอื่นๆ เป็น null",
-        "- หากไม่ใช่ภาพอุปกรณ์ข้างต้น หรือค่าไม่ชัดเจนเบลอมาก หรือวิเคราะห์ไม่ได้ ให้ระบุ type: 'unknown' และตั้งค่าตัวเลขทุกช่องเป็น null",
-        "",
-        "ให้ตอบกลับเป็นรูปแบบ JSON ต่อไปนี้เท่านั้น ห้ามมีข้อความเกริ่นหรือสรุปท้ายนอกจาก JSON:",
-        JSON.stringify({
-          type: "blood_pressure | blood_sugar | weight | unknown",
-          systolic: "number or null",
-          diastolic: "number or null",
-          heartRate: "number or null",
-          bloodSugar: "number or null",
-          weight: "number or null",
-          confidence: "high | low"
-        }, null, 2)
-      ].join("\n");
-
-      const answer = await askAI(prompt, filesArray, { purpose: "analysis" });
-
-      let cleanJson = answer.trim();
-      const jsonMatch = cleanJson.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        cleanJson = jsonMatch[0];
-      }
-
-      const result = JSON.parse(cleanJson) as {
-        type: string;
-        systolic: number | null;
-        diastolic: number | null;
-        heartRate: number | null;
-        bloodSugar: number | null;
-        weight: number | null;
-        confidence: string;
+      const answer = await askAI(VITALS_PROMPT, filesArray, { purpose: "analysis" });
+      const result = JSON.parse(answer.trim().match(/\{[\s\S]*\}/)?.[0] || answer) as {
+        type: string; systolic: number | null; diastolic: number | null; heartRate: number | null;
+        bloodSugar: number | null; weight: number | null; confidence: string;
       };
-
       if (result.type === "unknown" || result.confidence === "low" || (!result.systolic && !result.bloodSugar && !result.weight)) {
-        toast.error("⚠️ AI ไม่มั่นใจในภาพกล้องเครื่องวัดนี้ กรุณาถ่ายภาพให้ชัดขึ้น หรือกรอกข้อมูลด้วยตนเอง");
-      } else {
-        setForm((current) => {
-          const next = { ...current };
-          const fillMsg = [];
-
-          if (result.systolic && result.diastolic) {
-            next.systolic = String(result.systolic);
-            next.diastolic = String(result.diastolic);
-            fillMsg.push(`ความดันโลหิต ${result.systolic}/${result.diastolic} mmHg`);
-
-            if (result.heartRate) {
-              next.heartRate = String(result.heartRate);
-              fillMsg.push(`ชีพจร ${result.heartRate} bpm`);
-            }
-          }
-          if (result.bloodSugar) {
-            next.bloodSugar = String(result.bloodSugar);
-            fillMsg.push(`ระดับน้ำตาล ${result.bloodSugar} mg/dL`);
-          }
-          if (result.weight) {
-            next.weight = String(result.weight);
-            fillMsg.push(`น้ำหนักตัว ${result.weight} kg`);
-          }
-
-          if (fillMsg.length > 0) {
-            toast.success(`✅ สแกนสำเร็จ: ป้อนค่า ${fillMsg.join(" และ ")} ให้คุณแล้ว!`);
-          }
-          return next;
-        });
+        toast.error("⚠️ AI ไม่มั่นใจในภาพเครื่องวัดนี้ กรุณาถ่ายภาพให้ชัดขึ้น หรือกรอกข้อมูลด้วยตนเอง");
+        return;
       }
+      const next: Partial<typeof form> = {};
+      const filled: string[] = [];
+      if (result.systolic && result.diastolic) {
+        next.systolic = String(result.systolic);
+        next.diastolic = String(result.diastolic);
+        filled.push(`ความดันโลหิต ${result.systolic}/${result.diastolic} mmHg`);
+        if (result.heartRate) {
+          next.heartRate = String(result.heartRate);
+          filled.push(`ชีพจร ${result.heartRate} bpm`);
+        }
+      }
+      if (result.bloodSugar) {
+        next.bloodSugar = String(result.bloodSugar);
+        filled.push(`ระดับน้ำตาล ${result.bloodSugar} mg/dL`);
+      }
+      if (result.weight) {
+        next.weight = String(result.weight);
+        filled.push(`น้ำหนักตัว ${result.weight} kg`);
+      }
+      setForm(current => ({ ...current, ...next }));
+      if (filled.length) toast.success(`✅ สแกนสำเร็จ: ป้อนค่า ${filled.join(" และ ")} ให้คุณแล้ว ตรวจสอบก่อนบันทึก`);
     } catch (err) {
-      console.error("Camera vitals scan failed:", err);
-      toast.error("⚠️ ไม่สามารถสแกนจากกล้องได้ กรุณากรอกข้อมูลด้วยตนเอง");
+      console.error("Vitals scan failed:", err);
+      toast.error("⚠️ ไม่สามารถสแกนภาพได้ กรุณากรอกข้อมูลด้วยตนเอง");
     } finally {
       setDeviceScanning(false);
     }
+  }
+
+  async function handleDeviceCameraCapture(base64Data: string) {
+    setDeviceImagePreview(base64Data);
+    await scanVitals([{ type: "image/jpeg", name: "vitals_camera.jpg", data: base64Data }]);
   }
 
   async function handleFoodCameraCapture(base64Data: string) {
@@ -275,163 +211,18 @@ export default function PatientHealthPage() {
     }
   }
 
-  function parseVitalsFromFilename(filename: string) {
-    const clean = filename.toLowerCase();
-
-    if (clean.includes("bp") || clean.includes("pressure") || clean.includes("dia") || clean.includes("sys")) {
-      const matches = clean.match(/(\d{2,3})\D+(\d{2,3})(?:\D+(\d{2,3}))?/);
-      if (matches) {
-        return {
-          type: "blood_pressure",
-          systolic: Number(matches[1]),
-          diastolic: Number(matches[2]),
-          heartRate: matches[3] ? Number(matches[3]) : 72,
-          bloodSugar: null,
-          weight: null,
-          confidence: "high"
-        };
-      }
-    }
-
-    if (clean.includes("sugar") || clean.includes("glucose") || clean.includes("glu")) {
-      const matches = clean.match(/(\d{2,3})/);
-      if (matches) {
-        return {
-          type: "blood_sugar",
-          systolic: null,
-          diastolic: null,
-          heartRate: null,
-          bloodSugar: Number(matches[1]),
-          weight: null,
-          confidence: "high"
-        };
-      }
-    }
-
-    if (clean.includes("weight") || clean.includes("scale") || clean.includes("kg")) {
-      const matches = clean.match(/(\d{2,3})/);
-      if (matches) {
-        return {
-          type: "weight",
-          systolic: null,
-          diastolic: null,
-          heartRate: null,
-          bloodSugar: null,
-          weight: Number(matches[1]),
-          confidence: "high"
-        };
-      }
-    }
-
-    return null;
-  }
-
   async function handleDeviceScan(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
-
-    setDeviceScanning(true);
     setDeviceImagePreview(URL.createObjectURL(file));
-
+    let data: string;
     try {
-      const base64Data = await compressAndResizeImage(file);
-      const filesArray = [
-        {
-          type: "image/jpeg",
-          name: file.name.split(".")[0] + ".jpg",
-          data: base64Data
-        }
-      ];
-
-      const prompt = [
-        "บทบาท: คุณคือ AI ผู้เชี่ยวชาญการประเมินภาพถ่ายเครื่องวัดทางแพทย์และอุปกรณ์ตรวจวัดสัญญาณชีพด้วยตนเองที่บ้านสำหรับผู้ป่วยโรคเบาหวานและความดันโลหิตสูง",
-        "หน้าที่: ตรวจประเมินภาพถ่ายอุปกรณ์และสกัดตัวเลขสัญญาณชีพเด่นจากภาพหน้าจอนั้น",
-        "คำแนะนำในการตรวจจับ:",
-        "- หากเป็นหน้าจอเครื่องวัดความดันโลหิต (มักแสดงเลข SYS, DIA, PULSE): ให้ระบุตัวเลข SYS ในช่อง systolic, DIA ในช่อง diastolic และ PULSE/Heart rate ในช่อง heartRate ส่วนช่องอื่นๆ เช่น sugar และ weight ให้เป็น null ห้ามเอาตัวเลขความดันหรือชีพจรไปใส่ในช่องน้ำหวานหรือน้ำหนักเด็ดขาด",
-        "- หากเป็นหน้าจอเครื่องวัดระดับน้ำตาลในเลือด (มักมีตัวเลข mg/dL): ให้ระบุค่าในช่อง bloodSugar ส่วนอื่นๆ เป็น null",
-        "- หากเป็นหน้าจอเครื่องชั่งน้ำหนัก (มักระบุค่าเป็น kg): ให้ระบุค่าในช่อง weight ส่วนอื่นๆ เป็น null",
-        "- หากไม่ใช่ภาพอุปกรณ์ข้างต้น หรือค่าไม่ชัดเจนเบลอมาก หรือวิเคราะห์ไม่ได้ ให้ระบุ type: 'unknown' และตั้งค่าตัวเลขทุกช่องเป็น null",
-        "",
-        "ให้ตอบกลับเป็นรูปแบบ JSON ต่อไปนี้เท่านั้น ห้ามมีข้อความเกริ่นหรือสรุปท้ายนอกจาก JSON:",
-        JSON.stringify({
-          type: "blood_pressure | blood_sugar | weight | unknown",
-          systolic: "number or null",
-          diastolic: "number or null",
-          heartRate: "number or null",
-          bloodSugar: "number or null",
-          weight: "number or null",
-          confidence: "high | low"
-        }, null, 2)
-      ].join("\n");
-
-      let answer = "";
-      try {
-        answer = await askAI(prompt, filesArray, { purpose: "analysis" });
-      } catch (networkError) {
-        if (isAwsMode) throw networkError;
-        console.warn("Demo scanner failed");
-        const parsed = parseVitalsFromFilename(file.name);
-        if (parsed) {
-          answer = JSON.stringify(parsed);
-        } else {
-          throw networkError;
-        }
-      }
-
-      let cleanJson = answer.trim();
-      const jsonMatch = cleanJson.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        cleanJson = jsonMatch[0];
-      }
-
-      const result = JSON.parse(cleanJson) as {
-        type: string;
-        systolic: number | null;
-        diastolic: number | null;
-        heartRate: number | null;
-        bloodSugar: number | null;
-        weight: number | null;
-        confidence: string;
-      };
-
-      if (result.type === "unknown" || result.confidence === "low" || (!result.systolic && !result.bloodSugar && !result.weight)) {
-        toast.error("⚠️ AI ไม่มั่นใจในภาพเครื่องวัดนี้ กรุณาถ่ายภาพให้ชัดขึ้น หรือกรอกข้อมูลด้วยตนเอง");
-      } else {
-        setForm((current) => {
-          const next = { ...current };
-          const fillMsg = [];
-
-          if (result.systolic && result.diastolic) {
-            next.systolic = String(result.systolic);
-            next.diastolic = String(result.diastolic);
-            fillMsg.push(`ความดันโลหิต ${result.systolic}/${result.diastolic} mmHg`);
-
-            if (result.heartRate) {
-              next.heartRate = String(result.heartRate);
-              fillMsg.push(`ชีพจร ${result.heartRate} bpm`);
-            }
-          }
-          if (result.bloodSugar) {
-            next.bloodSugar = String(result.bloodSugar);
-            fillMsg.push(`ระดับน้ำตาล ${result.bloodSugar} mg/dL`);
-          }
-          if (result.weight) {
-            next.weight = String(result.weight);
-            fillMsg.push(`น้ำหนักตัว ${result.weight} kg`);
-          }
-
-          if (fillMsg.length > 0) {
-            toast.success(`✅ สแกนสำเร็จ: ป้อนค่า ${fillMsg.join(" และ ")} ให้คุณแล้ว!`);
-          }
-          return next;
-        });
-      }
+      data = await compressAndResizeImage(file);
     } catch (err) {
-      console.error("Device scan failed:", err);
-      toast.error("⚠️ ไม่สามารถสแกนภาพได้ กรุณากรอกข้อมูลด้วยตนเอง");
-    } finally {
-      setDeviceScanning(false);
+      toast.error(err instanceof Error ? err.message : "อ่านรูปไม่ได้ กรุณากรอกข้อมูลด้วยตนเอง");
+      return;
     }
+    await scanVitals([{ type: "image/jpeg", name: file.name.split(".")[0] + ".jpg", data }]);
   }
 
   function submitRecord() {
@@ -544,7 +335,7 @@ export default function PatientHealthPage() {
         <HealthLiquidTabs value={activeTab} />
         <TabsContent value="records" className="space-y-6">
           <section className="care-sheet p-5">
-            <header className="mb-5"><h2 className="mobile-section-title">วันนี้ร่างกายเป็นยังไง?</h2><p className="mt-1 text-xs text-slate-500">กรอกเอง หรือให้รูปช่วยอ่านค่า</p></header>
+            <header className="mb-5"><h2 className="mobile-section-title">วันนี้ร่างกายเป็นยังไง?</h2><p className="mt-1 text-xs text-slate-500">กรอกเอง หรือให้รูปช่วยอ่านค่า</p>{!isAwsMode && <p className="mt-2 text-[11px] text-amber-800">โหมดสาธิต: ผลจากรูปเป็นค่าตัวอย่างของ AI จำลอง แก้เป็นค่าจริงก่อนบันทึก</p>}</header>
             <div className="mb-5 grid grid-cols-2 gap-2">
               <button type="button" onClick={()=>setIsVitalsCameraOpen(true)} className="flex min-h-[70px] items-center justify-center gap-2 rounded-[20px] bg-[#e4f2fd] text-sm font-medium text-sky-800"><Camera className="h-5 w-5"/>ถ่ายรูปเครื่องวัด</button>
               <label className="flex min-h-[70px] cursor-pointer items-center justify-center gap-2 rounded-[20px] bg-[#efebfa] text-sm font-medium text-violet-700"><Upload className="h-5 w-5"/>เลือกรูป<input type="file" className="sr-only" aria-label="เลือกรูปเครื่องวัด" accept="image/*" onChange={handleDeviceScan}/></label>
@@ -562,7 +353,7 @@ export default function PatientHealthPage() {
         </TabsContent>
         <TabsContent value="charts"><MobileHealthChart records={records}/></TabsContent>
         <TabsContent value="food" className="space-y-5">
-          <section className="relative overflow-hidden rounded-[30px_30px_40px_24px] bg-[#e6f3eb] p-5"><h2 className="relative z-10 text-2xl font-bold leading-9 text-emerald-900">มื้อนี้<br/>กินอะไรดี?</h2><p className="relative z-10 mt-2 text-xs text-emerald-700">ให้ผู้ช่วยดูสารอาหารให้</p><HealthCharm mood="meal" className="mobile-float absolute -right-2 bottom-0 h-32 w-32"/></section>
+          <section className="relative overflow-hidden rounded-[30px_30px_40px_24px] bg-[#e6f3eb] p-5"><h2 className="relative z-10 text-2xl font-bold leading-9 text-emerald-900">มื้อนี้<br/>กินอะไรดี?</h2><p className="relative z-10 mt-2 text-xs text-emerald-700">ให้ผู้ช่วยดูสารอาหารให้</p>{!isAwsMode && <p className="relative z-10 mt-2 text-[11px] text-amber-800">โหมดสาธิต: ผลจากรูปเป็นค่าตัวอย่างของ AI จำลอง ค่าสารอาหารเป็นค่าประมาณจากตารางตัวอย่าง</p>}<HealthCharm mood="meal" className="mobile-float absolute -right-2 bottom-0 h-32 w-32"/></section>
           <section className="care-sheet p-5"><div className="grid grid-cols-2 gap-2"><button type="button" onClick={()=>setIsFoodCameraOpen(true)} className="flex min-h-[70px] items-center justify-center gap-2 rounded-[20px] bg-sky-50 text-sm font-medium text-sky-800"><Camera className="h-5 w-5"/>ถ่ายรูปอาหาร</button><label className="flex min-h-[70px] cursor-pointer items-center justify-center gap-2 rounded-[20px] bg-[#fff0da] text-sm font-medium text-amber-800"><Upload className="h-5 w-5"/>เลือกรูป<input type="file" className="sr-only" aria-label="เลือกรูปอาหาร" accept="image/*" onChange={handleFileChange}/></label></div>
           {foodImage&&<img src={foodImage} alt="อาหารที่เลือก" className="mt-4 max-h-48 w-full rounded-2xl object-contain"/>}
           <form className="mt-4 space-y-3" onSubmit={e=>{e.preventDefault();if(foodNameInput.trim()){setScannerReady(true);runFoodAnalysis(foodNameInput,foodFilesPayload);}}}><label htmlFor="food-name" className="mobile-form-label">หรือพิมพ์ชื่อเมนู</label><Input id="food-name" placeholder="เช่น ข้าวกะเพราไข่ดาว" value={foodNameInput} onChange={e=>setFoodNameInput(e.target.value)} disabled={scannerLoading}/><Button className="h-12 w-full rounded-full" disabled={scannerLoading||!foodNameInput.trim()}>{scannerLoading?<Loader2 className="h-4 w-4 animate-spin"/>:<Utensils className="h-4 w-4"/>}{scannerLoading?"กำลังดูสารอาหาร…":"ดูสารอาหาร"}</Button></form>{!foodImage && !scannerLoading && <ManualMealButton name={foodNameInput} patientId={patient.id} />}</section>

@@ -62,6 +62,23 @@ export function persistMockStore(db: MockDatabase) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
 }
 
+// Demo only: a newly registered patient starts with a copy of the first synthetic patient's history and plan.
+// Returns the same object when nothing needs seeding, so callers can skip a state update.
+export function seedFromTemplate(db: MockDatabase, patientId: string, body: { weight?: number; height?: number }): MockDatabase {
+  const templateId = db.patients[0]?.id;
+  const records = db.healthRecords.filter(r => r.patientId === templateId);
+  if (!templateId || templateId === patientId || !records.length || db.healthRecords.some(r => r.patientId === patientId)) return db;
+  const stamp = Date.now();
+  const plan = db.carePlans.find(p => p.patientId === templateId);
+  const warning = db.earlyWarnings.find(w => w.patientId === templateId);
+  return {
+    ...db,
+    healthRecords: [...db.healthRecords, ...records.map((r, i) => ({ ...r, id: `${patientId}-R-${i}-${stamp}`, patientId, weight: body.weight || 70, height: body.height || 170 }))],
+    carePlans: plan ? [...db.carePlans.filter(p => p.patientId !== patientId), { ...plan, id: `plan-${patientId}`, patientId, tasks: plan.tasks.map((t, i) => ({ ...t, id: `task-${patientId}-${i}`, status: "pending" as const, pendingConfirm: undefined })) }] : db.carePlans,
+    earlyWarnings: warning ? [...db.earlyWarnings.filter(w => w.patientId !== patientId), { ...warning, id: `ew-${patientId}`, patientId }] : db.earlyWarnings
+  };
+}
+
 export function addHealthRecord(db: MockDatabase, record: Omit<HealthRecord, "id">): MockDatabase {
   const newRecord: HealthRecord = {
     ...record,

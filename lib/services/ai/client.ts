@@ -9,7 +9,11 @@ export async function askAI(content: string, files?: Array<{ type: string; name:
   return (await askAssistant(content, files, options)).text;
 }
 export async function askAssistant(content: string, files?: Array<{ type: string; name: string; data: string }>, options?: AIOptions): Promise<AssistantReply> {
-  if (!isAwsMode) throw new Error("AI ใช้ได้ในโหมด AWS หลังตั้งค่า Cognito และ Bedrock เท่านั้น");
+  if (!isAwsMode) {
+    const [{ demoAssistant }, { loadMockStore }] = await Promise.all([import("./demo"), import("@/lib/services/mock-store")]);
+    await new Promise(resolve => setTimeout(resolve, 400)); // lets the "thinking" state render like a real request
+    return demoAssistant(loadMockStore(), content, options);
+  }
   const payload = await cloudRequest<AssistantReply>("/api/ai/chat", {
     method: "POST", body: JSON.stringify({ content, files: files?.length ? files : undefined, sessionId: options?.sessionId || "main", patientId: options?.patientId, purpose: options?.purpose || "chat" })
   });

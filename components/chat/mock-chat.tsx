@@ -10,6 +10,7 @@ import { askAssistant } from "@/lib/services/ai/client";
 import { AssistantDraftCard } from "@/components/health/patient-memory";
 import { MarkdownRenderer } from "@/components/ui/markdown-renderer";
 import { AgentEvidence } from "@/components/health/agent-evidence";
+import { isAwsMode } from "@/lib/runtime";
 
 export function MockChat({
   title,
@@ -77,7 +78,7 @@ export function MockChat({
 
   const prompts = mode === "patient" ? ["วันนี้ควรดูแลตัวเองยังไง?", "ช่วยวางแผนมื้ออาหาร"] : ["ช่วยจัดตารางดูแล", "เวลาฉันเหนื่อย ควรทำยังไง?"];
   return <section>
-    <header className="relative mb-5 flex min-h-[130px] items-center overflow-hidden rounded-[30px_30px_40px_24px] bg-[#e9f3ff] p-5"><div className="relative z-10"><h2 className="text-2xl font-bold">{title}</h2><p className="mt-1 text-xs text-slate-500">อยากรู้เรื่องไหน ถามได้เลย</p></div><HealthCharm className="mobile-float absolute -right-3 -top-1 h-32 w-32 opacity-75"/></header>
+    <header className="relative mb-5 flex min-h-[130px] items-center overflow-hidden rounded-[30px_30px_40px_24px] bg-[#e9f3ff] p-5"><div className="relative z-10"><h2 className="text-2xl font-bold">{title}</h2><p className="mt-1 text-xs text-slate-500">อยากรู้เรื่องไหน ถามได้เลย</p>{!isAwsMode && <p className="mt-2 inline-block rounded-full bg-amber-100 px-3 py-1 text-[11px] font-medium text-amber-900">โหมดสาธิต: AI จำลอง ไม่ใช่คำแนะนำทางการแพทย์</p>}</div><HealthCharm className="mobile-float absolute -right-3 -top-1 h-32 w-32 opacity-75"/></header>
     <div className="max-h-[440px] space-y-5 overflow-y-auto pb-3 pr-1 thin-scrollbar" aria-live="polite" aria-relevant="additions">
       {messages.map(message=><div key={message.id} className={message.role==="user"?"flex justify-end":"flex flex-col items-start"}>
         <div className={message.role==="user"?"max-w-[85%] rounded-[22px_22px_6px_22px] bg-sky-100 px-4 py-3 text-sm leading-7 text-sky-950":"w-full px-1 text-sm leading-7 text-slate-700"}>

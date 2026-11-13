@@ -8,6 +8,7 @@ import { beginSignIn, currentCloudUser, cloudSignOut, accessToken } from "@/lib/
 import { AppUser, UserRole } from "@/lib/types";
 import { getRoleFromEmail, loginWithEmail, logoutUser, readMockUser, resetPassword } from "@/lib/services/auth";
 import { useMockStore } from "@/lib/hooks/use-mock-store";
+import { seedFromTemplate } from "@/lib/services/mock-store";
 
 interface AuthContextValue {
   user: AppUser | null;
@@ -134,100 +135,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           };
 
           setDb((currentDb) => {
-            const templateId = currentDb.patients[0]?.id || "P-0001";
-            
-            // Clone health records
-            const somchaiRecords = currentDb.healthRecords.filter(r => r.patientId === templateId);
-            const clonedRecords = somchaiRecords.map((r, idx) => ({
-              ...r,
-              id: `${patientId}-R-${idx}-${Date.now()}`,
-              patientId: patientId,
-              weight: Number(extra?.weight || 70),
-              height: Number(extra?.height || 170)
-            }));
-
-            // Clone care plan
-            const somchaiCarePlan = currentDb.carePlans.find(cp => cp.patientId === templateId);
-            const clonedCarePlan = somchaiCarePlan ? {
-              ...somchaiCarePlan,
-              id: `plan-${patientId}`,
-              patientId: patientId,
-              tasks: somchaiCarePlan.tasks.map((t, idx) => ({
-                ...t,
-                id: `task-${patientId}-${idx}`,
-                status: "pending" as const,
-                pendingConfirm: undefined
-              }))
-            } : {
-              id: `plan-${patientId}`,
-              patientId: patientId,
-              doctorId: "demo-doctor",
-              status: "approved" as const,
-              updatedAt: new Date().toISOString(),
-              summary: "ควบคุมอาหารเค็มและน้ำตาลอย่างสม่ำเสมอ ออกกำลังกายเบาๆ",
-              medication: ["Metformin 500mg (เช้า-เย็น หลังอาหาร)", "Amlodipine 5mg (เช้า หลังอาหาร)"],
-              diet: ["ลดคาร์โบไฮเดรตเชิงเดี่ยว ชา กาแฟหวาน", "เน้นโปรตีนไขมันต่ำ ผักต้ม"],
-              exercise: ["เดินเร็ว 30 นาทีต่อวัน", "สัปดาห์ละ 3-5 วัน"],
-              measurement: ["วัดความดันทุกเช้าก่อนทานอาหาร", "เจาะระดับน้ำตาลสัปดาห์ละ 2 ครั้ง"],
-              followUp: ["พบแพทย์เพื่อประเมินผลในอีก 2 เดือน"],
-              lifestyle: ["นอนหลับพักผ่อนให้เพียงพอ 7-8 ชั่วโมง", "ดื่มน้ำสะอาดวันละ 8 แก้ว"],
-              tasks: [
-                {
-                  id: `task-${patientId}-1`,
-                  title: "ทานยา Metformin 500mg",
-                  category: "medication" as const,
-                  time: "08:00",
-                  detail: "เช้า หลังอาหารทันที",
-                  status: "pending" as const
-                },
-                {
-                  id: `task-${patientId}-2`,
-                  title: "วัดระดับความดันและชีพจร",
-                  category: "measurement" as const,
-                  time: "07:30",
-                  detail: "วัดด้วยเครื่องวัดอัตโนมัติก่อนทานอาหาร",
-                  status: "pending" as const
-                }
-              ]
-            };
-
-            // Clone early warning
-            const somchaiWarning = currentDb.earlyWarnings.find(ew => ew.patientId === templateId);
-            const clonedWarning = somchaiWarning ? {
-              ...somchaiWarning,
-              patientId: patientId
-            } : {
-              id: `ew-${patientId}`,
-              patientId: patientId,
-              level: "green" as const,
-              score: 0,
-              contributors: [],
-              reason: "สัญญาณชีพอยู่ในเกณฑ์ปกติ",
-              patientRecommendation: "ดูแลสุขภาพต่อเนื่อง",
-              doctorRecommendation: "ไม่มีข้อควรระวังเร่งด่วน",
-              suggestedAction: "เฝ้าระวังต่อเนื่อง",
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString()
-            };
-
-            const nextDb = {
-              ...currentDb,
-              patients: [...currentDb.patients, newPatient],
-              healthRecords: [...currentDb.healthRecords, ...clonedRecords],
-              earlyWarnings: [...currentDb.earlyWarnings, clonedWarning],
-              carePlans: [...currentDb.carePlans, clonedCarePlan]
-            };
-
-            nextDb.chatHistory[patientId] = [
-              {
-                id: `msg-${Date.now()}`,
-                role: "assistant",
-                content: `สวัสดีครับคุณ ${name} ยินดีต้อนรับสู่ระบบ WELLYNC ครับ ผมเป็น AI ประเมินประวัติสุขภาพส่วนตัวของคุณครับ มีเรื่องอะไรปรึกษาด้านสุขภาพเบาหวานและความดันวันนี้ไหมครับ?`,
-                time: new Date().toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })
-              }
-            ];
-
-            return nextDb;
+            const nextDb = seedFromTemplate({ ...currentDb, patients: [...currentDb.patients, newPatient] }, patientId, newPatient);
+            return { ...nextDb, chatHistory: { ...nextDb.chatHistory, [patientId]: [{
+              id: `msg-${Date.now()}`,
+              role: "assistant",
+              content: `สวัสดีครับคุณ ${name} ยินดีต้อนรับสู่ระบบ WELLYNC ครับ ผมเป็น AI ประเมินประวัติสุขภาพส่วนตัวของคุณครับ มีเรื่องอะไรปรึกษาด้านสุขภาพเบาหวานและความดันวันนี้ไหมครับ?`,
+              time: new Date().toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })
+            }] } };
           });
         }
         
